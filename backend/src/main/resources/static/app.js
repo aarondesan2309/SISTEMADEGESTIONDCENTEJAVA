@@ -972,11 +972,11 @@ document.addEventListener('DOMContentLoaded', () => {
                     <tr>
                         <td><strong>${c.carrera || 'N/A'}</strong></td>
                         <td>${c.nombre} <span style="font-size:0.75rem;color:#64748b;display:block;">${c.condicion}</span></td>
-                        <td style="font-family:monospace;font-size:0.8rem;">RFC: ${c.rfc||'-'}<br>CURP: ${c.curp||'-'}</td>
+                        <td style="font-size:0.85rem; font-weight:600; color:var(--color-maroon);">${c.materia}</td>
                         <td><span style="background:#f1f5f9;padding:4px 8px;border-radius:6px;font-size:0.8rem;border:1px solid #cbd5e1;">${regimeName}</span></td>
                         <td>${printedText}</td>
                         <td style="text-align:center;">
-                            <button class="btn-action" onclick="window.generarContrato(${c.docente_id}, '${c.nombre}')" style="padding:6px 14px;font-size:0.85rem;">🖨️ Imprimir</button>
+                            <button class="btn-action" onclick="window.generarContrato(${c.docente_id}, '${c.nombre.replace(/'/g, "\\'")}')" style="padding:6px 14px;font-size:0.85rem;">🖨️ Imprimir</button>
                         </td>
                     </tr>
                 `;
@@ -1064,12 +1064,13 @@ document.addEventListener('DOMContentLoaded', () => {
                     <th style="padding:10px;text-align:center;">Tabulador</th>
                     <th style="padding:10px;text-align:center;">Horas</th>
                     <th style="padding:10px;text-align:right;">Subtotal Men.</th>
+                    <th style="padding:10px;text-align:center;">Acción</th>
                 </tr>`;
             
             let totalMensual = 0;
             let totalHorasDocente = 0;
             if (materias.length === 0) {
-                htmlTabla += `<tr><td colspan="4" style="padding:10px;text-align:center;">Sin materias asignadas</td></tr>`;
+                htmlTabla += `<tr><td colspan="5" style="padding:10px;text-align:center;">Sin materias asignadas</td></tr>`;
             } else {
                 materias.forEach((m, idx) => {
                     const horas = m.horas || 0;
@@ -1081,6 +1082,16 @@ document.addEventListener('DOMContentLoaded', () => {
 
                     const subtotal = horas * tarifaLocal;
                     totalMensual += subtotal;
+                    
+                    // VALIDACION DE CARRERA: Solo puede generar de su propia carrera
+                    const puedeGenerar = currentUser.role === 'ADM' || m.carrera === currentUser.role;
+                    const btnHtml = puedeGenerar 
+                        ? `<button onclick="window.confirmarGeneracionIndividual(${docenteId}, ${m.materia_id}, '${m.materia.replace(/'/g, "\\'")}', '${nombre.replace(/'/g, "\\'")}')" 
+                                   style="padding:5px 10px; background:var(--color-maroon); color:white; border:none; border-radius:4px; cursor:pointer; font-size:0.75rem;">
+                                   🖨️ Generar
+                           </button>`
+                        : `<span style="font-size:0.7rem; color:#94a3b8; font-style:italic;">No autorizado (${m.carrera})</span>`;
+
                     htmlTabla += `<tr style="border-bottom:1px solid #e2e8f0;">
                         <td style="padding:10px; font-weight:600;">${m.materia} <span style="font-size:0.75rem;color:#64748b;font-weight:normal;display:block;">${m.carrera}</span></td>
                         <td style="padding:10px;text-align:center;">
@@ -1094,12 +1105,14 @@ document.addEventListener('DOMContentLoaded', () => {
                             <input type="number" min="0" value="${horas}" style="width:60px; text-align:center; padding:4px; border:1px solid #ccc; border-radius:4px;" onchange="window.recalcPreview(this, ${docenteId}, '${m.materia}', '${nivel}')" /> hrs
                         </td>
                         <td style="padding:10px;text-align:right; font-family:monospace; font-size:0.95rem;">$${subtotal.toLocaleString('es-MX', {minimumFractionDigits:2})}</td>
+                        <td style="padding:10px;text-align:center;">${btnHtml}</td>
                     </tr>`;
                 });
             }
             htmlTabla += `<tr style="background:#f8fafc; font-weight:bold;">
                 <td colspan="3" style="padding:10px;text-align:right;">SUBTOTAL BRUTO MENSUAL:</td>
                 <td style="padding:10px;text-align:right;color:var(--color-maroon);font-family:monospace; font-size:1.05rem;">$${totalMensual.toLocaleString('es-MX', {minimumFractionDigits:2})} MXN</td>
+                <td></td>
             </tr>
             </table>
             
@@ -1218,56 +1231,64 @@ document.addEventListener('DOMContentLoaded', () => {
         }
     };
 
+    window.confirmarGeneracionIndividual = async function(docenteId, materiaId, materiaNombre, docenteNombre) {
+        if (!confirm(`¿Deseas generar el contrato para la materia "${materiaNombre}"?`)) return;
+        
+        const btn = event.target;
+        const ogText = btn.innerHTML;
+        btn.innerHTML = '⏳...';
+        btn.disabled = true;
+
+        try {
+            const payload = {
+                docente_id: docenteId,
+                materia_id: materiaId,
+                emitido_por: currentUser.name || currentUser.role,
+                user_role: currentUser.role
+            };
+
+            const res = await fetch(`/api/generarContrato`, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify(payload)
+            });
+
+            if(!res.ok) {
+                const err = await res.json().catch(()=>({}));
+                throw new Error(err.message || 'Error del servidor');
+            }
+
+            const blob = await res.blob();
+            const url = window.URL.createObjectURL(blob);
+            const a = document.createElement('a');
+            a.style.display = 'none';
+            a.href = url;
+            a.download = `Contrato_${docenteNombre.split(' ').join('_')}_${materiaNombre.split(' ').join('_')}.docx`;
+            document.body.appendChild(a);
+            a.click();
+            
+            setTimeout(() => {
+                document.body.removeChild(a);
+                window.URL.revokeObjectURL(url);
+            }, 1000);
+
+            alert("Contrato generado exitosamente.");
+            loadContratosFromDatabase();
+            // window.closePreviewModal(); // Opcional: no cerrar para permitir generar otras materias
+        } catch(err) {
+            alert("Error: " + err.message);
+            btn.innerHTML = ogText;
+            btn.disabled = false;
+        } finally {
+            btn.innerHTML = ogText;
+            btn.disabled = false;
+        }
+    };
+
     const btnConfirm = document.getElementById('btn-confirm-generar');
     if (btnConfirm) {
-        btnConfirm.addEventListener('click', async function() {
-            if (!pendingContratoPayload) return;
-            
-            const btn = this;
-            const ogText = btn.innerHTML;
-            btn.innerHTML = '⏳ Generando DOCX...';
-            btn.disabled = true;
-
-            try {
-                const res = await fetch(`/api/generarContrato`, {
-                    method: 'POST',
-                    headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify(pendingContratoPayload)
-                });
-
-                if(!res.ok) {
-                    const err = await res.json().catch(()=>({}));
-                    throw new Error(err.message || 'Error del servidor');
-                }
-
-                const blob = await res.blob();
-                const url = window.URL.createObjectURL(blob);
-                const a = document.createElement('a');
-                a.style.display = 'none';
-                a.href = url;
-                a.download = `Contrato_${(pendingContratoPayload.nombre || 'Docente').split(' ').join('_')}.docx`;
-                document.body.appendChild(a);
-                a.click();
-                
-                // Cleanup after a short delay
-                setTimeout(() => {
-                    document.body.removeChild(a);
-                    window.URL.revokeObjectURL(url);
-                }, 1000);
-
-                window.closePreviewModal();
-                loadContratosFromDatabase(); 
-                alert("Contrato generado exitosamente.");
-            } catch(err) {
-                alert("Error al generar contrato: " + err.message);
-                btn.innerHTML = ogText;
-                btn.disabled = false;
-            } finally {
-                btn.innerHTML = "\u2713 Confirmar y Descargar WORD";
-                btn.disabled = false;
-                pendingContratoPayload = null;
-            }
-        });
+        btnConfirm.innerHTML = "Cerrar Ventana";
+        btnConfirm.onclick = () => window.closePreviewModal();
     }
 
 });

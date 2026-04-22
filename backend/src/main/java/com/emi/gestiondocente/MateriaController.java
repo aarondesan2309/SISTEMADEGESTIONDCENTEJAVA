@@ -22,7 +22,8 @@ public class MateriaController {
     @GetMapping("/materias/{id}")
     public ResponseEntity<List<Map<String, Object>>> getMateriasByDocente(@PathVariable int id) {
         String sql = """
-            SELECT m.nombre as materia,
+            SELECT m.materia_id,
+                   m.nombre as materia,
                    COALESCE(c.siglas, 'N/A') as carrera,
                    MAX(COALESCE(a.horas, 0)) as horas,
                    MAX(a.nivel_pago) as nivel_pago,
@@ -32,7 +33,7 @@ public class MateriaController {
             LEFT JOIN Carrera c ON m.carrera_id = c.carrera_id
             JOIN Docente d ON a.docente_id = d.docente_id
             WHERE a.docente_id = ?
-            GROUP BY m.nombre, c.siglas
+            GROUP BY m.materia_id, m.nombre, c.siglas
             ORDER BY m.nombre
             """;
         List<Map<String, Object>> result = jdbcTemplate.queryForList(sql, id);
