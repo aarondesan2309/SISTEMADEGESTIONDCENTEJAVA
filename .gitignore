@@ -1,0 +1,41 @@
+# Java / Spring Boot
+target/
+*.class
+*.jar
+*.war
+*.ear
+*.log
+
+# Maven
+.mvn/
+apache-maven-3.9.6/
+
+# IDEs
+.idea/
+.vscode/
+*.swp
+*.swo
+*.swn
+
+# Archivos temporales del sistema
+Thumbs.db
+.DS_Store
+
+# Archivos temporales de Word y pruebas
+out_temp_*.docx
+prueba.docx
+temp_docx/
+tmp_docx_inspect/
+~$*.docx
+
+# DATOS PRIVADOS (PSO) - NO SUBIR POR SEGURIDAD
+fotos/
+expedientes/
+cedulas/
+
+# Database dumps (Opcional: puedes subirlos si quieres, pero suelen ser pesados)
+# db_*.sql
+
+# Otros
+proyecto.zip
+MAR-AGO26.zip

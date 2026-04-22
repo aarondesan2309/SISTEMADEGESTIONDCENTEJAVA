@@ -1,0 +1,755 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>S.E.M. | Sistema de Gestion Docente - EMI</title>
+    <link rel="stylesheet" href="index.css?v=2026.4">
+    <style>
+        .auth-hidden { display: none !important; }
+        .landing-wrapper {
+            display: flex; align-items: center; justify-content: center;
+            flex-direction: column; width: 100vw; min-height: 100vh;
+            background: linear-gradient(160deg, #f8fafc 0%, #f1f5f9 100%);
+        }
+        .sem-header { text-align: center; margin-bottom: 50px; }
+        .sem-header h1 {
+            color: var(--color-maroon); font-size: 2rem; text-transform: uppercase;
+            font-weight: 900; letter-spacing: 2px;
+        }
+        .sem-header p { color: #64748b; font-size: 1.1rem; margin-top: 10px; font-weight: 500; }
+        .schools-grid { display: flex; gap: 30px; flex-wrap: wrap; justify-content: center; max-width: 1000px; }
+        .school-card {
+            background: white; border-radius: 16px; padding: 40px 30px; text-align: center;
+            box-shadow: 0 4px 20px rgba(0,0,0,0.06); border-bottom: 4px solid var(--color-gold);
+            cursor: pointer; transition: all 0.3s; width: 250px;
+        }
+        .school-card:hover { transform: translateY(-8px); box-shadow: 0 12px 30px rgba(99,27,47,0.15); border-bottom-color: var(--color-maroon); }
+        .school-card h3 { color: var(--color-maroon); margin-top: 15px; font-size: 1rem; font-weight: 700; }
+        .login-wrapper {
+            display: flex; align-items: center; justify-content: center;
+            width: 100vw; height: 100vh;
+            background: linear-gradient(135deg, var(--color-military-bg), #1a2a1d);
+            position: relative;
+        }
+        .btn-back-landing {
+            position: absolute; top: 20px; left: 20px; color: white; cursor: pointer;
+            font-weight: 500; background: transparent; border: 1px solid white;
+            padding: 8px 16px; border-radius: 6px;
+        }
+        .btn-back-landing:hover { background: rgba(255,255,255,0.1); }
+        .login-card {
+            background: #ffffff; width: 100%; max-width: 450px; padding: 40px;
+            border-radius: 12px; box-shadow: 0 10px 40px rgba(0,0,0,0.5); text-align: center;
+        }
+        .login-card h2 { color: var(--color-maroon); font-size: 1.1rem; margin-bottom: 8px; font-weight: 800; }
+        .login-card h4 { color: #666; margin-bottom: 24px; }
+        .login-card label { display: block; text-align: left; font-size: 0.9rem; color: #333; margin-bottom: 6px; font-weight: 600; }
+        .login-card input, .login-card select {
+            width: 100%; padding: 10px; border: 1px solid #ccc; border-radius: 6px; margin-bottom: 16px; font-size: 0.95rem;
+        }
+        .login-card button {
+            width: 100%; background: linear-gradient(135deg, var(--color-maroon), #8f2343);
+            color: white; border: none; padding: 14px; font-size: 1rem; font-weight: 800;
+            border-radius: 8px; cursor: pointer; transition: all 0.3s;
+        }
+        .login-card button:hover { transform: translateY(-2px); box-shadow: 0 8px 20px rgba(99,27,47,0.3); }
+    </style>
+</head>
+<body>
+
+    <!-- Landing SEM Container -->
+    <div id="landing-container" class="landing-wrapper fade-in">
+        <div class="sem-header">
+            <div style="width: 130px; height: 130px; background: url('https://upload.wikimedia.org/wikipedia/commons/thumb/2/2a/Escudo_Nacional_de_M%C3%A9xico.svg/1200px-Escudo_Nacional_de_M%C3%A9xico.svg.png') no-repeat center center; background-size: contain; margin: 0 auto 25px auto; filter: drop-shadow(0 10px 20px rgba(0,0,0,0.1));"></div>
+            <h1 class="fade-up delay-1">SISTEMA EDUCATIVO MILITAR</h1>
+            <p class="fade-up delay-2">Seleccione su Plantel para ingresar al Sistema</p>
+        </div>
+
+        <div class="schools-grid fade-up delay-3">
+            <div class="school-card" onclick="openLogin('EMI')">
+                <img src="emi.png" class="school-logo-img" alt="Escudo EMI" style="width:140px;height:140px;object-fit:contain;">
+                <h3>Escuela Militar de Ingenieria (EMI)</h3>
+            </div>
+            <div class="school-card" onclick="alert('Modulo EMM no configurado. Elija EMI.')">
+                <img src="emm.png" class="school-logo-img" alt="Escudo EMM" style="width:140px;height:140px;object-fit:contain;">
+                <h3>Escuela Militar de Medicina (EMM)</h3>
+            </div>
+            <div class="school-card" onclick="alert('Modulo EMO no configurado. Elija EMI.')">
+                <img src="emo.png" class="school-logo-img" alt="Escudo EMO" style="width:140px;height:140px;object-fit:contain;">
+                <h3>Escuela Militar de Odontologia (EMO)</h3>
+            </div>
+        </div>
+    </div>
+
+    <!-- Login Container -->
+    <div id="login-container" class="login-wrapper auth-hidden fade-in">
+        <button class="btn-back-landing" onclick="backToLanding()">&#8592; Regresar al Hub SEM</button>
+        <div class="login-card">
+            <img src="emi.png" style="width:100px;height:auto;margin-bottom:15px;" alt="Logo EMI"/>
+            <h2>SISTEMA DE GESTION DOCENTE</h2>
+            <h4 id="login-school-title" style="font-size:0.9rem;color:#555;">(Escuela)</h4>
+            <form id="login-form">
+                <div class="form-group">
+                    <label>Usuario</label>
+                    <input type="text" id="login-user" placeholder="Nombre de usuario">
+                </div>
+                <div class="form-group">
+                    <label>Contrasena</label>
+                    <input type="password" id="login-pass" placeholder="Contrasena">
+                </div>
+                <div class="form-group" style="margin-top:8px;">
+                    <label style="color:#888;font-size:0.78rem;">Plataforma Segura</label>
+                </div>
+                <button type="submit">INGRESAR AL SISTEMA</button>
+            </form>
+        </div>
+    </div>
+
+    <!-- App Container -->
+    <div id="app-wrapper" class="app-container auth-hidden fade-in">
+
+        <!-- Navbar Header -->
+        <header class="top-header">
+            <h1 id="app-main-title">BIENVENIDO AL SISTEMA DE GESTION DOCENTE (EMI)</h1>
+            <div class="user-status">
+                <span id="display-user-role" style="font-size:1rem;"></span>
+            </div>
+        </header>
+
+        <!-- Main Content -->
+        <main class="main-content">
+
+            <!-- Dashboard View -->
+            <div id="view-dashboard" class="view-section active text-center">
+                <h3 class="module-title">MODULOS DE CONTROL (S.E.M.)</h3>
+                <div id="grid-main-modules" class="grid-modules">
+                    <div class="module-card" data-req-role="ALL" onclick="appNavigate('docentes')">
+                        <div>
+                            <div style="font-size:2.5rem;margin-bottom:12px;">&#127963;</div>
+                            GESTION DE DOCENTES
+                        </div>
+                    </div>
+                    <div class="module-card" data-req-role="ALL" onclick="appNavigate('evaluaciones')">
+                        <div>
+                            <div style="font-size:2.5rem;margin-bottom:12px;">&#128221;</div>
+                            EVALUACIONES ACAD.
+                        </div>
+                    </div>
+                    <div class="module-card" data-req-role="ALL" onclick="appNavigate('contratos')">
+                        <div>
+                            <div style="font-size:2.5rem;margin-bottom:12px;">&#128209;</div>
+                            FORMATOS Y CONTRATOS
+                        </div>
+                    </div>
+
+                    <div class="module-card" data-req-role="ALL" onclick="appNavigate('presupuesto')">
+                        <div>
+                            <div style="font-size:2.5rem;margin-bottom:12px;">&#128181;</div>
+                            PRESUPUESTO P.S.O.
+                        </div>
+                    </div>
+                    <div class="module-card" data-req-role="ALL" onclick="appNavigate('vehiculos')">
+                        <div>
+                            <div style="font-size:2.5rem;margin-bottom:12px;">&#128664;</div>
+                            CONTROL VEHICULAR
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- View: Docentes -->
+            <div id="view-docentes" class="view-section hidden">
+                <button class="btn-back" onclick="appNavigate('dashboard')">&#8592; Volver al Menu</button>
+                <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:16px;">
+                    <h2 style="color:var(--color-maroon); text-transform:uppercase;">Directorio de Docentes</h2>
+                    <button class="btn-action hidden" id="btn-add-docente" onclick="openAddModal()">+ AGREGAR DOCENTE</button>
+                </div>
+                <!-- Contadores -->
+                <div id="docentes-stats" style="margin-bottom:20px; display:flex; gap:8px; flex-wrap:wrap;">
+                    <span style="background:#e2e8f0;color:#444;padding:6px 16px;border-radius:20px;font-weight:600;">Cargando...</span>
+                </div>
+                <!-- Búsqueda en tiempo real -->
+                <div style="margin-bottom:16px;">
+                    <div style="position:relative;max-width:420px;">
+                        <span style="position:absolute;left:13px;top:50%;transform:translateY(-50%);color:#94a3b8;font-size:1.05rem;">&#128269;</span>
+                        <input type="text" id="docente-search" placeholder="Buscar por nombre, RFC, CURP, ID..." oninput="filtrarDocentes()" style="width:100%;padding:10px 14px 10px 40px;border:1.5px solid #e2e8f0;border-radius:10px;font-size:0.95rem;box-sizing:border-box;transition:border 0.2s;" onfocus="this.style.borderColor='#631b2f'" onblur="this.style.borderColor='#e2e8f0'">
+                    </div>
+                </div>
+                <div class="glass-card">
+                    <div class="table-container">
+                        <table class="data-table">
+                            <thead>
+                                <tr>
+                                    <th>CARRERA(S)</th>
+                                    <th>ID</th>
+                                    <th>CONDICION / GRADO / NOMBRE</th>
+                                    <th>RFC</th>
+                                    <th>CURP</th>
+                                    <th>ACCIONES</th>
+                                </tr>
+                            </thead>
+                            <tbody id="docentes-tbody">
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+            </div>
+
+            <!-- MODAL: VER / EDITAR PERFIL -->
+            <div id="modal-perfil" class="hidden" style="position:fixed;top:0;left:0;right:0;bottom:0;background:rgba(10,15,30,0.75);z-index:1001;display:flex;justify-content:center;align-items:flex-start;overflow-y:auto;padding:30px 20px;backdrop-filter:blur(4px);">
+                <div style="background:white;width:100%;max-width:780px;border-radius:24px;overflow:hidden;box-shadow:0 30px 80px rgba(0,0,0,0.3);margin:auto;position:relative;">
+                    
+                    <!-- Header banda guinda -->
+                    <div style="background:linear-gradient(135deg,#3a0d18,#631b2f);padding:28px 36px;display:flex;align-items:center;gap:24px;">
+                        <!-- Foto del docente -->
+                        <div style="position:relative;flex-shrink:0;">
+                            <div id="p-foto-preview" style="width:90px;height:90px;border-radius:50%;background:#fff3;border:3px solid rgba(255,255,255,0.5);display:flex;align-items:center;justify-content:center;overflow:hidden;">
+                                <span id="p-foto-initials" style="color:white;font-size:2rem;font-weight:800;font-family:var(--font-display);">?</span>
+                                <img id="p-foto-img" src="" alt="" style="display:none;width:100%;height:100%;object-fit:cover;">
+                            </div>
+                            <label for="p-foto-input" title="Subir fotografia" style="position:absolute;bottom:0;right:0;background:#c3a364;border-radius:50%;width:26px;height:26px;display:flex;align-items:center;justify-content:center;cursor:pointer;border:2px solid white;">
+                                <span style="color:white;font-size:0.85rem;">&#128247;</span>
+                            </label>
+                            <input type="file" id="p-foto-input" accept="image/*" style="display:none;" onchange="previewFoto(this)">
+                        </div>
+                        <div style="flex:1;">
+                            <div id="perfil-badge-bar" style="margin-bottom:6px;"></div>
+                            <div id="p-nombre-display" style="color:white;font-size:1.3rem;font-weight:800;font-family:var(--font-display);letter-spacing:0.5px;"></div>
+                            <div id="p-carrera-display" style="color:rgba(255,255,255,0.65);font-size:0.9rem;margin-top:3px;"></div>
+                        </div>
+                        <button onclick="cerrarPerfil()" style="background:rgba(255,255,255,0.1);border:1px solid rgba(255,255,255,0.3);color:white;border-radius:50%;width:36px;height:36px;cursor:pointer;font-size:1.1rem;display:flex;align-items:center;justify-content:center;flex-shrink:0;">&times;</button>
+                    </div>
+
+                    <!-- TAB BAR -->
+                    <div style="background:#f8fafc;border-bottom:1px solid #e2e8f0;display:flex;">
+                        <button id="tab-datos-btn" class="perfil-tab active" onclick="switchPerfilTab('datos')">&#128100; Datos Personales</button>
+                        <button id="tab-expediente-btn" class="perfil-tab" onclick="switchPerfilTab('expediente')">&#128194; Expediente PSO</button>
+                        <button id="tab-eval-hist-btn" class="perfil-tab" onclick="switchPerfilTab('evalhistorial')">&#128202; Evaluaciones</button>
+                    </div>
+
+                    <!-- TAB: DATOS PERSONALES -->
+                    <div id="tab-datos" class="perfil-tab-content" style="padding:32px 36px;">
+                        <div style="display:grid;grid-template-columns:1fr 1fr;gap:18px;">
+                            <div style="grid-column:1/-1;">
+                                <label class="lbl-field">NOMBRE COMPLETO</label>
+                                <input id="p-nombre" oninput="document.getElementById('p-nombre-display').textContent=this.value" style="width:100%;padding:11px 14px;border:1.5px solid #e2e8f0;border-radius:10px;font-size:1rem;font-family:var(--font-main);transition:border 0.2s;" onfocus="this.style.borderColor='#631b2f'" onblur="this.style.borderColor='#e2e8f0'">
+                            </div>
+                            <div>
+                                <label class="lbl-field">CONDICION</label>
+                                <select id="p-condicion" onchange="toggleMilitarFields()" style="width:100%;padding:11px 14px;border:1.5px solid #e2e8f0;border-radius:10px;font-size:0.95rem;">
+                                    <option value="Personal Civil">Personal Civil</option>
+                                    <option value="Personal Militar">Personal Militar</option>
+                                </select>
+                            </div>
+                            <div>
+                                <label class="lbl-field">GRADO ACADEMICO</label>
+                                <select id="p-grado-acad" style="width:100%;padding:11px 14px;border:1.5px solid #e2e8f0;border-radius:10px;font-size:0.95rem;">
+                                    <option value="">-- Sin especificar --</option>
+                                    <option value="Tecnico">Técnico Superior</option>
+                                    <option value="Licenciatura">Licenciatura</option>
+                                    <option value="Maestria">Maestría</option>
+                                    <option value="Doctorado">Doctorado</option>
+                                </select>
+                            </div>
+                            <div id="campo-matricula" style="display:none;">
+                                <label class="lbl-field" style="color:#631b2f;">MATRICULA MILITAR</label>
+                                <input id="p-matricula" style="width:100%;padding:11px 14px;border:1.5px solid #631b2f;border-radius:10px;font-family:monospace;font-size:0.95rem;background:#fff9fa;">
+                            </div>
+                            <div id="campo-grado-mil">
+                                <label class="lbl-field">GRADO MILITAR</label>
+                                <input id="p-grado-mil" style="width:100%;padding:11px 14px;border:1.5px solid #e2e8f0;border-radius:10px;font-size:0.95rem;" placeholder="Ej: Capitan, Mayor, Coronel...">
+                            </div>
+                            <div>
+                                <label class="lbl-field">RFC</label>
+                                <input id="p-rfc" style="width:100%;padding:11px 14px;border:1.5px solid #e2e8f0;border-radius:10px;font-family:monospace;font-size:0.95rem;">
+                            </div>
+                            <div>
+                                <label class="lbl-field">CURP</label>
+                                <input id="p-curp" style="width:100%;padding:11px 14px;border:1.5px solid #e2e8f0;border-radius:10px;font-family:monospace;font-size:0.95rem;">
+                            </div>
+                            <div>
+                                <label class="lbl-field">GENERO</label>
+                                <select id="p-genero" style="width:100%;padding:11px 14px;border:1.5px solid #e2e8f0;border-radius:10px;font-size:0.95rem;">
+                                    <option value="">-- Seleccionar --</option>
+                                    <option value="M">Masculino</option>
+                                    <option value="F">Femenino</option>
+                                </select>
+                            </div>
+                            <div>
+                                <label class="lbl-field">TIPO DE SANGRE</label>
+                                <select id="p-sangre" style="width:100%;padding:11px 14px;border:1.5px solid #e2e8f0;border-radius:10px;font-size:0.95rem;">
+                                    <option value="">--</option>
+                                    <option>A+</option><option>A-</option>
+                                    <option>B+</option><option>B-</option>
+                                    <option>AB+</option><option>AB-</option>
+                                    <option>O+</option><option>O-</option>
+                                </select>
+                            </div>
+                            <div style="grid-column:1/-1;">
+                                <label class="lbl-field">No. CREDENCIAL INE / PASAPORTE</label>
+                                <input id="p-ine" style="width:100%;padding:11px 14px;border:1.5px solid #e2e8f0;border-radius:10px;font-family:monospace;font-size:0.95rem;">
+                            </div>
+                            <div style="grid-column:1/-1;">
+                                <label class="lbl-field">DOMICILIO</label>
+                                <input id="p-domicilio" style="width:100%;padding:11px 14px;border:1.5px solid #e2e8f0;border-radius:10px;font-size:0.9rem;">
+                            </div>
+                            <div style="grid-column:1/-1;">
+                                <label class="lbl-field">MATERIAS ASIGNADAS</label>
+                                <div id="p-materias" style="background:#f8fafc;padding:12px 16px;border-radius:10px;font-size:0.88rem;min-height:44px;border:1px solid #e2e8f0;"></div>
+                            </div>
+                            <div style="grid-column:1/-1;">
+                                <label class="lbl-field">CÉDULA PROFESIONAL</label>
+                                <div style="display:flex;align-items:center;gap:12px;">
+                                    <div id="p-cedula-status" style="flex:1;background:#f8fafc;padding:12px 16px;border-radius:10px;font-size:0.88rem;border:1px solid #e2e8f0;color:#888;">
+                                        <em>Sin cédula registrada</em>
+                                    </div>
+                                    <label for="p-cedula-input" style="background:linear-gradient(135deg,#0f766e,#14b8a6);color:white;padding:10px 18px;border-radius:10px;cursor:pointer;font-weight:700;font-size:0.85rem;white-space:nowrap;transition:all 0.2s;box-shadow:0 4px 12px rgba(15,118,110,0.25);">
+                                        &#128196; Subir Cédula
+                                    </label>
+                                    <input type="file" id="p-cedula-input" accept=".pdf,.jpg,.jpeg,.png" style="display:none;" onchange="previewCedula(this)">
+                                </div>
+                            </div>
+                        </div>
+                        <input type="hidden" id="p-id">
+                        <div style="margin-top:28px;display:flex;gap:12px;">
+                            <button class="btn-action" style="flex:2;" onclick="guardarPerfil()">&#10003; Guardar Cambios</button>
+                            <button onclick="cerrarPerfil()" style="flex:1;background:transparent;color:#64748b;border:1.5px solid #e2e8f0;padding:14px;border-radius:12px;cursor:pointer;font-weight:700;font-family:var(--font-main);transition:all 0.2s;" onmouseover="this.style.background='#f8fafc'" onmouseout="this.style.background='transparent'">Cerrar</button>
+                        </div>
+                    </div>
+
+                    <!-- TAB: EXPEDIENTE PSO -->
+                    <div id="tab-expediente" class="perfil-tab-content" style="padding:32px 36px;display:none;">
+                        <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:20px;">
+                            <div>
+                                <h3 style="color:var(--color-maroon);font-family:var(--font-display);font-size:1.1rem;margin:0;">EXPEDIENTE DIGITAL — PSO CONTRATACIÓN</h3>
+                                <p style="color:#64748b;font-size:0.82rem;margin-top:4px;">Procedimiento Sistemático de Operar — SEDENA / D.G.E.M.</p>
+                            </div>
+                        </div>
+                        <!-- Barra de progreso -->
+                        <div style="margin-bottom:24px;">
+                            <div style="display:flex;justify-content:space-between;margin-bottom:6px;">
+                                <span style="font-weight:700;font-size:0.85rem;color:#475569;">Progreso del expediente</span>
+                                <span id="exp-progress-text" style="font-weight:800;font-size:0.85rem;color:var(--color-maroon);">0/16 documentos</span>
+                            </div>
+                            <div style="background:#e2e8f0;border-radius:10px;height:10px;overflow:hidden;">
+                                <div id="exp-progress-bar" style="background:linear-gradient(90deg,var(--color-maroon),#c3a364);height:100%;width:0%;transition:width 0.5s ease;border-radius:10px;"></div>
+                            </div>
+                        </div>
+                        <!-- Checklist de documentos -->
+                        <div id="exp-checklist" style="display:grid;gap:8px;"></div>
+                        <div style="margin-top:20px;text-align:right;">
+                            <button onclick="cerrarPerfil()" style="background:transparent;color:#64748b;border:1.5px solid #e2e8f0;padding:12px 24px;border-radius:10px;cursor:pointer;font-weight:700;font-family:var(--font-main);">Cerrar</button>
+                        </div>
+                    </div>
+
+                    <!-- TAB: HISTORIAL EVALUACIONES -->
+                    <div id="tab-evalhistorial" class="perfil-tab-content" style="padding:32px 36px;display:none;">
+                        <h3 style="color:var(--color-maroon);font-family:var(--font-display);font-size:1.1rem;margin:0 0 20px;">HISTORIAL DE EVALUACIONES</h3>
+                        <div id="p-eval-history" style="display:grid;gap:12px;">
+                            <em style="color:#aaa;">Cargando...</em>
+                        </div>
+                        <div style="margin-top:20px;text-align:right;">
+                            <button onclick="cerrarPerfil()" style="background:transparent;color:#64748b;border:1.5px solid #e2e8f0;padding:12px 24px;border-radius:10px;cursor:pointer;font-weight:700;font-family:var(--font-main);">Cerrar</button>
+                        </div>
+                    </div>
+
+                </div>
+            </div>
+
+            <!-- MODAL: AGREGAR DOCENTE (COMPLETO) -->
+            <div id="modal-add-docente" class="hidden" style="position:fixed;top:0;left:0;right:0;bottom:0;background:rgba(10,15,30,0.78);z-index:1000;display:flex;justify-content:center;align-items:flex-start;overflow-y:auto;padding:30px 20px;backdrop-filter:blur(4px);">
+                <div style="background:white;width:100%;max-width:680px;border-radius:20px;overflow:hidden;box-shadow:0 30px 80px rgba(0,0,0,0.35);margin:auto;position:relative;">
+                    <!-- Header -->
+                    <div style="background:linear-gradient(135deg,#3a0d18,#631b2f);padding:24px 32px;display:flex;align-items:center;justify-content:space-between;">
+                        <div>
+                            <div style="color:rgba(255,255,255,0.65);font-size:0.78rem;font-weight:600;letter-spacing:1px;text-transform:uppercase;">Sistema de Gestión Docente</div>
+                            <h3 style="color:white;margin:4px 0 0;font-size:1.2rem;font-weight:800;">Registrar Nuevo Docente</h3>
+                        </div>
+                        <button onclick="closeAddModal()" style="background:rgba(255,255,255,0.1);border:1px solid rgba(255,255,255,0.3);color:white;border-radius:50%;width:36px;height:36px;cursor:pointer;font-size:1.2rem;display:flex;align-items:center;justify-content:center;">&times;</button>
+                    </div>
+                    <!-- Body -->
+                    <div style="padding:28px 32px;">
+                        <form id="form-add-docente">
+                            <div style="display:grid;grid-template-columns:1fr 1fr;gap:16px;">
+
+                                <!-- Nombre -->
+                                <div style="grid-column:1/-1;">
+                                    <label class="lbl-field">NOMBRE COMPLETO <span style="color:#c0392b;">*</span></label>
+                                    <input type="text" id="add-obj-nombre" required placeholder="Apellido Paterno Apellido Materno Nombre(s)" style="width:100%;padding:10px 13px;border:1.5px solid #e2e8f0;border-radius:9px;font-size:0.95rem;box-sizing:border-box;">
+                                </div>
+
+                                <!-- Condicion -->
+                                <div>
+                                    <label class="lbl-field">CONDICIÓN <span style="color:#c0392b;">*</span></label>
+                                    <select id="add-obj-condicion" onchange="toggleAddMilitarFields()" required style="width:100%;padding:10px 13px;border:1.5px solid #e2e8f0;border-radius:9px;font-size:0.95rem;">
+                                        <option value="Personal Civil">Personal Civil</option>
+                                        <option value="Personal Militar">Personal Militar</option>
+                                    </select>
+                                </div>
+
+                                <!-- Genero -->
+                                <div>
+                                    <label class="lbl-field">GÉNERO <span style="color:#c0392b;">*</span></label>
+                                    <select id="add-obj-genero" required style="width:100%;padding:10px 13px;border:1.5px solid #e2e8f0;border-radius:9px;font-size:0.95rem;">
+                                        <option value="">-- Seleccionar --</option>
+                                        <option value="M">Masculino</option>
+                                        <option value="F">Femenino</option>
+                                    </select>
+                                </div>
+
+                                <!-- Grado Academico -->
+                                <div>
+                                    <label class="lbl-field">GRADO ACADÉMICO <span style="color:#c0392b;">*</span></label>
+                                    <select id="add-obj-grado-acad" required style="width:100%;padding:10px 13px;border:1.5px solid #e2e8f0;border-radius:9px;font-size:0.95rem;">
+                                        <option value="">-- Seleccionar --</option>
+                                        <option value="Tecnico">Técnico Superior</option>
+                                        <option value="Licenciatura">Licenciatura</option>
+                                        <option value="Maestria">Maestría</option>
+                                        <option value="Doctorado">Doctorado</option>
+                                    </select>
+                                </div>
+
+                                <!-- Grado Militar (solo si militar) -->
+                                <div id="add-campo-grado-mil" style="display:none;">
+                                    <label class="lbl-field" style="color:#631b2f;">GRADO MILITAR</label>
+                                    <input type="text" id="add-obj-grado-mil" placeholder="Ej: Teniente, Mayor, Coronel..." style="width:100%;padding:10px 13px;border:1.5px solid #631b2f;border-radius:9px;font-size:0.95rem;background:#fff9fa;box-sizing:border-box;">
+                                </div>
+
+                                <!-- Matricula (solo si militar) -->
+                                <div id="add-campo-matricula" style="display:none;">
+                                    <label class="lbl-field" style="color:#631b2f;">MATRÍCULA MILITAR <span style="color:#c0392b;">*</span></label>
+                                    <input type="text" id="add-obj-matricula" placeholder="No. de Matrícula" style="width:100%;padding:10px 13px;border:1.5px solid #631b2f;border-radius:9px;font-family:monospace;font-size:0.95rem;background:#fff9fa;box-sizing:border-box;">
+                                </div>
+
+                                <!-- RFC -->
+                                <div>
+                                    <label class="lbl-field">RFC <span style="color:#c0392b;">*</span></label>
+                                    <input type="text" id="add-obj-rfc" required placeholder="RFC del docente" maxlength="13" style="width:100%;padding:10px 13px;border:1.5px solid #e2e8f0;border-radius:9px;font-family:monospace;font-size:0.95rem;box-sizing:border-box;" oninput="this.value=this.value.toUpperCase()">
+                                </div>
+
+                                <!-- CURP -->
+                                <div>
+                                    <label class="lbl-field">CURP <span style="color:#c0392b;">*</span></label>
+                                    <input type="text" id="add-obj-curp" required placeholder="CURP del docente" maxlength="18" style="width:100%;padding:10px 13px;border:1.5px solid #e2e8f0;border-radius:9px;font-family:monospace;font-size:0.95rem;box-sizing:border-box;" oninput="this.value=this.value.toUpperCase()">
+                                </div>
+
+                                <!-- Tipo de Sangre -->
+                                <div>
+                                    <label class="lbl-field">TIPO DE SANGRE</label>
+                                    <select id="add-obj-sangre" style="width:100%;padding:10px 13px;border:1.5px solid #e2e8f0;border-radius:9px;font-size:0.95rem;">
+                                        <option value="">--</option>
+                                        <option>A+</option><option>A-</option>
+                                        <option>B+</option><option>B-</option>
+                                        <option>AB+</option><option>AB-</option>
+                                        <option>O+</option><option>O-</option>
+                                    </select>
+                                </div>
+
+                                <!-- No. INE / Pasaporte -->
+                                <div>
+                                    <label class="lbl-field">No. CREDENCIAL INE / PASAPORTE</label>
+                                    <input type="text" id="add-obj-ine" placeholder="No. de identificación" style="width:100%;padding:10px 13px;border:1.5px solid #e2e8f0;border-radius:9px;font-family:monospace;font-size:0.95rem;box-sizing:border-box;">
+                                </div>
+
+                                <!-- Régimen SAT -->
+                                <div style="grid-column:1/-1;">
+                                    <label class="lbl-field">RÉGIMEN FISCAL (SAT) <span style="color:#c0392b;">*</span></label>
+                                    <select id="add-obj-regimen" required style="width:100%;padding:10px 13px;border:1.5px solid #e2e8f0;border-radius:9px;font-size:0.95rem;">
+                                        <option value="">-- Seleccione un Régimen --</option>
+                                        <option value="SP">Servicios Profesionales (Honorarios)</option>
+                                        <option value="RESICO">Régimen Simplificado de Confianza (RESICO)</option>
+                                        <option value="RS">Sueldos y Salarios (Asimilados)</option>
+                                    </select>
+                                </div>
+
+                                <!-- Domicilio -->
+                                <div style="grid-column:1/-1;">
+                                    <label class="lbl-field">DOMICILIO</label>
+                                    <input type="text" id="add-obj-domicilio" placeholder="Calle, No., Colonia, Ciudad, Estado" style="width:100%;padding:10px 13px;border:1.5px solid #e2e8f0;border-radius:9px;font-size:0.9rem;box-sizing:border-box;">
+                                </div>
+
+                                <!-- Unidad de Aprendizaje (Materia) -->
+                                <div>
+                                    <label class="lbl-field">UNIDAD DE APRENDIZAJE <span style="color:#c0392b;">*</span></label>
+                                    <input type="text" id="add-obj-materia" required placeholder="Nombre de la materia..." style="width:100%;padding:10px 13px;border:1.5px solid #e2e8f0;border-radius:9px;font-size:0.95rem;box-sizing:border-box;">
+                                </div>
+                                <!-- Foto del Docente -->
+                                <div>
+                                    <label class="lbl-field">FOTOGRAFÍA</label>
+                                    <div style="position:relative;">
+                                        <label for="add-obj-foto" style="display:flex;align-items:center;gap:8px;background:#f8fafc;border:1.5px dashed #cbd5e1;border-radius:9px;padding:12px 14px;cursor:pointer;transition:all 0.2s;" onmouseover="this.style.borderColor='#631b2f';this.style.background='#fff9fa'" onmouseout="this.style.borderColor='#cbd5e1';this.style.background='#f8fafc'">
+                                            <span style="font-size:1.4rem;">&#128247;</span>
+                                            <span id="add-foto-label" style="color:#64748b;font-size:0.88rem;">Seleccionar foto...</span>
+                                        </label>
+                                        <input type="file" id="add-obj-foto" accept="image/*" style="display:none;" onchange="document.getElementById('add-foto-label').textContent=this.files[0]?.name||'Seleccionar foto...'">
+                                    </div>
+                                </div>
+
+                                <!-- Cédula Profesional -->
+                                <div>
+                                    <label class="lbl-field">CÉDULA PROFESIONAL</label>
+                                    <div style="position:relative;">
+                                        <label for="add-obj-cedula" style="display:flex;align-items:center;gap:8px;background:#f8fafc;border:1.5px dashed #cbd5e1;border-radius:9px;padding:12px 14px;cursor:pointer;transition:all 0.2s;" onmouseover="this.style.borderColor='#0f766e';this.style.background='#f0fdfa'" onmouseout="this.style.borderColor='#cbd5e1';this.style.background='#f8fafc'">
+                                            <span style="font-size:1.4rem;">&#128196;</span>
+                                            <span id="add-cedula-label" style="color:#64748b;font-size:0.88rem;">Seleccionar cédula (PDF/IMG)...</span>
+                                        </label>
+                                        <input type="file" id="add-obj-cedula" accept=".pdf,.jpg,.jpeg,.png" style="display:none;" onchange="document.getElementById('add-cedula-label').textContent=this.files[0]?.name||'Seleccionar cédula...'">
+                                    </div>
+                                </div>
+
+                            </div>
+
+                            <div style="margin-top:24px;display:flex;gap:12px;">
+                                <button type="submit" class="btn-action" style="flex:2;">&#10003; Guardar Docente</button>
+                                <button type="button" onclick="closeAddModal()" style="flex:1;background:transparent;color:#64748b;border:1.5px solid #e2e8f0;padding:14px;border-radius:12px;cursor:pointer;font-weight:700;font-family:var(--font-main);">Cancelar</button>
+                            </div>
+                        </form>
+                    </div>
+                </div>
+            </div>
+
+            <!-- View: Evaluaciones -->
+            <div id="view-evaluaciones" class="view-section hidden">
+                <button class="btn-back" onclick="appNavigate('dashboard')">&#8592; Volver al Menu</button>
+                <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:16px;">
+                    <h2 style="color:var(--color-maroon);text-transform:uppercase;">Evaluaciones Académicas</h2>
+                    <button class="btn-action" onclick="openEvalModal()">+ NUEVA EVALUACIÓN</button>
+                </div>
+                <!-- Stats -->
+                <div id="eval-stats" style="margin-bottom:20px;display:flex;gap:8px;flex-wrap:wrap;">
+                    <span style="background:#e2e8f0;color:#444;padding:6px 16px;border-radius:20px;font-weight:600;">Cargando...</span>
+                </div>
+                <!-- Tabla -->
+                <div class="glass-card">
+                    <div class="table-container">
+                        <table class="data-table">
+                            <thead>
+                                <tr>
+                                    <th>ID</th>
+                                    <th>DOCENTE</th>
+                                    <th>PERIODO</th>
+                                    <th>DESEMPEÑO (30%)</th>
+                                    <th>PEDAGOGÍA (30%)</th>
+                                    <th>PERFIL (20%)</th>
+                                    <th>RESP. (20%)</th>
+                                    <th>FINAL</th>
+                                    <th>RESULTADO</th>
+                                </tr>
+                            </thead>
+                            <tbody id="evaluaciones-tbody">
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+            </div>
+
+            <!-- MODAL: NUEVA EVALUACION -->
+            <div id="modal-eval" class="hidden" style="position:fixed;top:0;left:0;right:0;bottom:0;background:rgba(10,15,30,0.78);z-index:1002;display:flex;justify-content:center;align-items:flex-start;overflow-y:auto;padding:30px 20px;backdrop-filter:blur(4px);">
+                <div style="background:white;width:100%;max-width:700px;border-radius:20px;overflow:hidden;box-shadow:0 30px 80px rgba(0,0,0,0.35);margin:auto;">
+                    <!-- Header -->
+                    <div style="background:linear-gradient(135deg,#1e3a5f,#2563eb);padding:24px 32px;display:flex;align-items:center;justify-content:space-between;">
+                        <div>
+                            <div style="color:rgba(255,255,255,0.65);font-size:0.78rem;font-weight:600;letter-spacing:1px;text-transform:uppercase;">S.E.M. — Criterios SEDENA</div>
+                            <h3 style="color:white;margin:4px 0 0;font-size:1.2rem;font-weight:800;">Evaluar Docente</h3>
+                        </div>
+                        <button onclick="closeEvalModal()" style="background:rgba(255,255,255,0.1);border:1px solid rgba(255,255,255,0.3);color:white;border-radius:50%;width:36px;height:36px;cursor:pointer;font-size:1.2rem;display:flex;align-items:center;justify-content:center;">&times;</button>
+                    </div>
+                    <!-- Body -->
+                    <div style="padding:28px 32px;">
+                        <div style="display:grid;grid-template-columns:1fr 1fr;gap:16px;margin-bottom:24px;">
+                            <div style="grid-column:1/-1;">
+                                <label class="lbl-field">DOCENTE <span style="color:#c0392b;">*</span></label>
+                                <select id="eval-docente" required style="width:100%;padding:10px 13px;border:1.5px solid #e2e8f0;border-radius:9px;font-size:0.95rem;">
+                                    <option value="">-- Seleccionar Docente --</option>
+                                </select>
+                            </div>
+                            <div>
+                                <label class="lbl-field">EVALUADOR</label>
+                                <input id="eval-evaluador" placeholder="Nombre del evaluador" style="width:100%;padding:10px 13px;border:1.5px solid #e2e8f0;border-radius:9px;font-size:0.95rem;box-sizing:border-box;">
+                            </div>
+                            <div>
+                                <label class="lbl-field">PERIODO</label>
+                                <select id="eval-periodo" style="width:100%;padding:10px 13px;border:1.5px solid #e2e8f0;border-radius:9px;font-size:0.95rem;">
+                                    <option value="Mar-Ago 2026">Mar-Ago 2026</option>
+                                    <option value="Sep-Feb 2027">Sep-Feb 2027</option>
+                                </select>
+                            </div>
+                        </div>
+
+                        <!-- Criterios con sliders -->
+                        <h4 style="color:var(--color-maroon);font-family:var(--font-display);margin-bottom:16px;font-size:0.95rem;">CRITERIOS DE EVALUACIÓN</h4>
+
+                        <div class="eval-criterion">
+                            <div class="eval-criterion-header">
+                                <span>&#128218; Desempeño Académico <strong>(30%)</strong></span>
+                                <span id="eval-val-desemp" class="eval-val-display">50</span>
+                            </div>
+                            <p class="eval-criterion-desc">Planeación didáctica, dominio disciplinar, actualización de contenidos</p>
+                            <input type="range" id="eval-desemp" min="0" max="100" value="50" class="eval-slider" oninput="updateEvalCalc()">
+                        </div>
+
+                        <div class="eval-criterion">
+                            <div class="eval-criterion-header">
+                                <span>&#128172; Calidad Pedagógica <strong>(30%)</strong></span>
+                                <span id="eval-val-pedag" class="eval-val-display">50</span>
+                            </div>
+                            <p class="eval-criterion-desc">Métodos de enseñanza, comunicación, fomento de valores</p>
+                            <input type="range" id="eval-pedag" min="0" max="100" value="50" class="eval-slider" oninput="updateEvalCalc()">
+                        </div>
+
+                        <div class="eval-criterion">
+                            <div class="eval-criterion-header">
+                                <span>&#127891; Cumplimiento de Perfil <strong>(20%)</strong></span>
+                                <span id="eval-val-perfil" class="eval-val-display">50</span>
+                            </div>
+                            <p class="eval-criterion-desc">Adecuación formación vs programa, actualización profesional</p>
+                            <input type="range" id="eval-perfil" min="0" max="100" value="50" class="eval-slider" oninput="updateEvalCalc()">
+                        </div>
+
+                        <div class="eval-criterion">
+                            <div class="eval-criterion-header">
+                                <span>&#9989; Responsabilidad Institucional <strong>(20%)</strong></span>
+                                <span id="eval-val-resp" class="eval-val-display">50</span>
+                            </div>
+                            <p class="eval-criterion-desc">Cumplimiento normativo, puntualidad, compromiso institucional</p>
+                            <input type="range" id="eval-resp" min="0" max="100" value="50" class="eval-slider" oninput="updateEvalCalc()">
+                        </div>
+
+                        <!-- Resultado calculado -->
+                        <div style="margin-top:20px;background:#f8fafc;border:2px solid #e2e8f0;border-radius:14px;padding:20px;text-align:center;">
+                            <div style="font-size:0.85rem;color:#64748b;font-weight:700;text-transform:uppercase;letter-spacing:1px;">Puntaje Final Ponderado</div>
+                            <div id="eval-puntaje-final" style="font-size:3rem;font-weight:900;color:var(--color-maroon);font-family:var(--font-display);margin:4px 0;">50.00</div>
+                            <div id="eval-resultado-badge" style="display:inline-block;padding:6px 20px;border-radius:20px;font-weight:800;font-size:0.9rem;">Pendiente</div>
+                        </div>
+
+                        <!-- Observaciones -->
+                        <div style="margin-top:16px;">
+                            <label class="lbl-field">OBSERVACIONES</label>
+                            <textarea id="eval-obs" rows="3" style="width:100%;padding:10px 13px;border:1.5px solid #e2e8f0;border-radius:9px;font-size:0.9rem;resize:vertical;box-sizing:border-box;font-family:var(--font-main);" placeholder="Comentarios adicionales sobre el desempeño del docente..."></textarea>
+                        </div>
+
+                        <div style="margin-top:24px;display:flex;gap:12px;">
+                            <button class="btn-action" style="flex:2;" onclick="guardarEvaluacion()">&#10003; Registrar Evaluación</button>
+                            <button type="button" onclick="closeEvalModal()" style="flex:1;background:transparent;color:#64748b;border:1.5px solid #e2e8f0;padding:14px;border-radius:12px;cursor:pointer;font-weight:700;font-family:var(--font-main);">Cancelar</button>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- MODAL: VISTA PREVIA CONTRATO -->
+            <div id="modal-preview-contrato" class="hidden" style="position:fixed;top:0;left:0;right:0;bottom:0;background:rgba(10,15,30,0.78);z-index:2000;display:flex;justify-content:center;align-items:flex-start;overflow-y:auto;padding:30px 20px;backdrop-filter:blur(4px);">
+                <div style="background:white;width:100%;max-width:800px;border-radius:20px;overflow:hidden;box-shadow:0 30px 80px rgba(0,0,0,0.35);margin:auto;">
+                    <!-- Header -->
+                    <div style="background:linear-gradient(135deg,#c3a364,#b59555);padding:24px 32px;display:flex;align-items:center;justify-content:space-between;">
+                        <div>
+                            <div style="color:rgba(255,255,255,0.85);font-size:0.78rem;font-weight:600;letter-spacing:1px;text-transform:uppercase;">Vista Previa Financiera</div>
+                            <h3 style="color:white;margin:4px 0 0;font-size:1.2rem;font-weight:800;">Desglose del Contrato</h3>
+                        </div>
+                        <button onclick="closePreviewModal()" style="background:rgba(255,255,255,0.1);border:1px solid rgba(255,255,255,0.3);color:white;border-radius:50%;width:36px;height:36px;cursor:pointer;font-size:1.2rem;display:flex;align-items:center;justify-content:center;">&times;</button>
+                    </div>
+                    <!-- Body -->
+                    <div style="padding:28px 32px;">
+                        <div id="preview-contrato-content"></div>
+                        <div style="margin-top:24px;display:flex;gap:12px;">
+                            <button class="btn-action" style="flex:2;" id="btn-confirm-generar">&#10003; Confirmar y Descargar WORD</button>
+                            <button type="button" onclick="closePreviewModal()" style="flex:1;background:transparent;color:#64748b;border:1.5px solid #e2e8f0;padding:14px;border-radius:12px;cursor:pointer;font-weight:700;font-family:var(--font-main);">Cancelar</button>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- View: Vehiculos -->
+            <div id="view-vehiculos" class="view-section hidden">
+                <button class="btn-back" onclick="appNavigate('dashboard')">&#8592; Volver al Menu</button>
+                <h2 style="color:var(--color-maroon);margin-bottom:24px;text-transform:uppercase;">Vehiculos Autorizados (S.E.M.)</h2>
+                <div class="glass-card">
+                    <div class="table-container">
+                        <table class="data-table">
+                            <thead>
+                                <tr>
+                                    <th>DUENO / DOCENTE</th>
+                                    <th>MARCA / MODELO</th>
+                                    <th>ANO / COLOR</th>
+                                    <th>PLACAS</th>
+                                    <th>ESTATUS</th>
+                                </tr>
+                            </thead>
+                            <tbody id="vehiculos-tbody">
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+            </div>
+
+            <!-- View: Contratos -->
+            <div id="view-contratos" class="view-section hidden">
+                <button class="btn-back" onclick="appNavigate('dashboard')">&#8592; Volver al Menu</button>
+                <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:24px;">
+                    <h2 style="color:var(--color-maroon);text-transform:uppercase;">Centro de Emisión de Contratos</h2>
+                </div>
+                <!-- Stats / Auditoria -->
+                <div id="contratos-stats" style="margin-bottom:20px;display:flex;gap:8px;flex-wrap:wrap;"></div>
+                
+                <div class="glass-card">
+                    <div class="table-container">
+                        <table class="data-table">
+                            <thead>
+                                <tr>
+                                    <th>CARRERA</th>
+                                    <th>DOCENTE</th>
+                                    <th>RÉGIMEN ASIGNADO</th>
+                                    <th>ÚLTIMA VEZ IMPRESO POR</th>
+                                    <th>ACCIÓN</th>
+                                </tr>
+                            </thead>
+                            <tbody id="contratos-tbody">
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+            </div>
+
+            <!-- View: Presupuesto P.S.O. -->
+            <div id="view-presupuesto" class="view-section hidden">
+                <button class="btn-back" onclick="appNavigate('dashboard')">&#8592; Volver al Menu</button>
+                <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:24px;">
+                    <div>
+                        <h2 style="color:var(--color-maroon);text-transform:uppercase;">Presupuesto Global (UDEFA)</h2>
+                        <p style="color:#64748b;font-size:0.9rem;margin-top:4px;">Cálculo concentrado de pago por Docente para requerimiento a UDEFA según nivel tabular.</p>
+                    </div>
+                    <button class="btn-action" onclick="window.print()">🖨️ IMPRIMIR / EXPORTAR</button>
+                </div>
+                <div class="glass-card">
+                    <div class="table-container">
+                        <table class="data-table" style="font-size:0.85rem;">
+                            <thead>
+                                <tr>
+                                    <th>DOCENTE</th>
+                                    <th>RÉGIMEN</th>
+                                    <th>UNIDAD APRENDIZAJE</th>
+                                    <th>HRS.</th>
+                                    <th>TAR. /HR</th>
+                                    <th>SUBTOTAL</th>
+                                    <th>I.V.A. (16%)</th>
+                                    <th>RET. ISR</th>
+                                    <th>RET. IVA</th>
+                                    <th>TOTAL NETO</th>
+                                </tr>
+                            </thead>
+                            <tbody id="presupuesto-tbody">
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+            </div>
+
+        </main>
+
+        <!-- Logout -->
+        <button id="btn-logout" class="btn-logout-floating">Cerrar Sesion</button>
+    </div>
+
+    <script src="app.js?v=2026.4"></script>
+</body>
+</html>
