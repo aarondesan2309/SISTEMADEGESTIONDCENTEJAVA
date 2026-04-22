@@ -319,43 +319,45 @@ public class ContratoController {
             int instrPos = xml.indexOf(searchKey, searchFrom);
             if (instrPos == -1) break;
 
-            // Buscar el inicio del campo (fldChar begin)
-            int beginPos = xml.lastIndexOf("w:fldCharType=\"begin\"", instrPos);
-            // Buscar el fin del campo (fldChar end)
-            int endPos = xml.indexOf("w:fldCharType=\"end\"", instrPos);
+            // 1. Vaciar la instrucción para que Word no muestre el código
+            int startInstr = xml.lastIndexOf("<w:instrText", instrPos);
+            int endInstr = xml.indexOf("</w:instrText>", instrPos);
+            if (startInstr != -1 && endInstr != -1) {
+                int openTagEnd = xml.indexOf(">", startInstr);
+                xml = xml.substring(0, openTagEnd + 1) + " " + xml.substring(endInstr);
+                // No actualizamos searchFrom aquí, seguimos buscando los delimitadores
+            }
 
-            if (beginPos == -1 || endPos == -1 || beginPos >= endPos) {
+            // 2. Encontrar los delimitadores de la zona de visualización
+            int sepPos = xml.indexOf("w:fldCharType=\"separate\"", searchFrom);
+            int endPos = xml.indexOf("w:fldCharType=\"end\"", searchFrom);
+
+            if (sepPos != -1 && endPos != -1 && sepPos < endPos) {
+                // Reemplazar contenido de los tags <w:t> dentro de esta zona
+                int zonePtr = sepPos;
+                boolean firstT = true;
+                while (true) {
+                    int tOpen = xml.indexOf("<w:t", zonePtr);
+                    if (tOpen == -1 || tOpen >= endPos) break;
+
+                    int tOpenEnd = xml.indexOf(">", tOpen);
+                    int tClose = xml.indexOf("</w:t>", tOpen);
+                    if (tClose == -1) break;
+
+                    String replacement = firstT ? valEscaped : "";
+                    int oldLen = tClose - (tOpenEnd + 1);
+                    xml = xml.substring(0, tOpenEnd + 1) + replacement + xml.substring(tClose);
+                    
+                    // Ajustar punteros por el cambio de longitud
+                    int diff = replacement.length() - oldLen;
+                    endPos += diff;
+                    zonePtr = tOpenEnd + 1 + replacement.length() + 6;
+                    firstT = false;
+                }
+                searchFrom = endPos + 1;
+            } else {
                 searchFrom = instrPos + 1;
-                continue;
             }
-
-            // Encontrar el inicio real de la etiqueta <w:fldChar del begin
-            int realStart = xml.lastIndexOf("<", beginPos);
-            // Encontrar el cierre real de la etiqueta </w:fldChar> o /> del end
-            int endTagClose = xml.indexOf(">", endPos);
-            if (endTagClose == -1) {
-                searchFrom = instrPos + 1;
-                continue;
-            }
-            int realEnd = endTagClose + 1;
-
-            // OPCIONAL: Intentar expandir a los límites de <w:r> para una limpieza total
-            int rStart = xml.lastIndexOf("<w:r", realStart);
-            if (rStart != -1 && (realStart - rStart) < 20) {
-                realStart = rStart;
-            }
-            int rEnd = xml.indexOf("</w:r>", realEnd);
-            if (rEnd != -1 && (rEnd - realEnd) < 20) {
-                realEnd = rEnd + 6;
-            }
-
-            // Reemplazar la estructura por texto plano envuelto en un Run básico
-            String prefix = xml.substring(0, realStart);
-            String suffix = xml.substring(realEnd);
-            String newNode = "<w:r><w:t xml:space=\"preserve\">" + valEscaped + "</w:t></w:r>";
-
-            xml = prefix + newNode + suffix;
-            searchFrom = prefix.length() + newNode.length();
         }
         return xml;
     }
