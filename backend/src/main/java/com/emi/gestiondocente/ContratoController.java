@@ -47,6 +47,35 @@ public class ContratoController {
         return ResponseEntity.ok(jdbcTemplate.queryForList(sql));
     }
 
+    @PostMapping("/anularContrato")
+    public ResponseEntity<?> anularContrato(@RequestBody Map<String, Object> payload) {
+        try {
+            Integer docId = (Integer) payload.get("docente_id");
+            Integer materiaId = (Integer) payload.get("materia_id");
+            String userRole = (String) payload.get("user_role");
+
+            if (docId == null || materiaId == null) {
+                return ResponseEntity.badRequest().body(Map.of("message", "docente_id y materia_id son obligatorios"));
+            }
+
+            // Validar permiso de carrera (opcional pero recomendado)
+            if (userRole != null && !userRole.equalsIgnoreCase("ADMIN") && !userRole.equalsIgnoreCase("DIRECTOR")) {
+                String carreraMateria = jdbcTemplate.queryForObject(
+                        "SELECT c.nombre FROM materia m JOIN carrera c ON m.carrera_id = c.carrera_id WHERE m.materia_id = ?",
+                        String.class, materiaId);
+                if (carreraMateria != null && !carreraMateria.equalsIgnoreCase(userRole)) {
+                    return ResponseEntity.status(403).body(Map.of("message", "No tienes permiso para anular contratos de la carrera " + carreraMateria));
+                }
+            }
+
+            jdbcTemplate.update("DELETE FROM contrato_emitido WHERE docente_id = ? AND materia_id = ?", docId, materiaId);
+            
+            return ResponseEntity.ok(Map.of("message", "Contrato anulado exitosamente. Ya puedes generarlo de nuevo."));
+        } catch (Exception e) {
+            return ResponseEntity.status(500).body(Map.of("message", "Error al anular contrato: " + e.getMessage()));
+        }
+    }
+
     @PostMapping("/generarContrato")
     public ResponseEntity<?> generarContrato(@RequestBody Map<String, Object> payload) {
         System.out.println("Solicitud de contrato recibida: " + payload);

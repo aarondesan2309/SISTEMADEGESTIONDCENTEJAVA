@@ -1105,7 +1105,14 @@ document.addEventListener('DOMContentLoaded', () => {
                             <input type="number" min="0" value="${horas}" style="width:60px; text-align:center; padding:4px; border:1px solid #ccc; border-radius:4px;" onchange="window.recalcPreview(this, ${docenteId}, '${m.materia}', '${nivel}')" /> hrs
                         </td>
                         <td style="padding:10px;text-align:right; font-family:monospace; font-size:0.95rem;">$${subtotal.toLocaleString('es-MX', {minimumFractionDigits:2})}</td>
-                        <td style="padding:10px;text-align:center;">${btnHtml}</td>
+                        <td style="padding:10px;text-align:center;">
+                            ${btnHtml}
+                            ${m.ya_emitido ? 
+                                `<button onclick="window.anularContrato(${docenteId}, ${m.materia_id}, '${m.materia.replace(/'/g, "\\'")}')" 
+                                         style="margin-top:5px; padding:3px 8px; background:#ef4444; color:white; border:none; border-radius:4px; cursor:pointer; font-size:0.65rem; display:block; width:100%;">
+                                         🗑️ Anular
+                                 </button>` : ''}
+                        </td>
                     </tr>`;
                 });
             }
@@ -1276,12 +1283,42 @@ document.addEventListener('DOMContentLoaded', () => {
             loadContratosFromDatabase();
             // window.closePreviewModal(); // Opcional: no cerrar para permitir generar otras materias
         } catch(err) {
-            alert("Error: " + err.message);
+            if (err.message.includes("ya se ha generado")) {
+                if (confirm(err.message + "\n\n¿Deseas ANULAR el registro anterior para poder generar uno nuevo?")) {
+                    await window.anularContrato(docenteId, materiaId, materiaNombre, true);
+                    return; // El usuario deberá darle clic de nuevo
+                }
+            } else {
+                alert("Error: " + err.message);
+            }
             btn.innerHTML = ogText;
             btn.disabled = false;
         } finally {
             btn.innerHTML = ogText;
             btn.disabled = false;
+        }
+    };
+
+    window.anularContrato = async function(docId, matId, matNombre, silencioso = false) {
+        if (!silencioso && !confirm(`¿Estás seguro de que deseas ANULAR el registro del contrato para "${matNombre}"?\n\nEsto permitirá generarlo de nuevo, pero eliminará el registro de emisión anterior.`)) return;
+        
+        try {
+            const res = await fetch('/api/anularContrato', {
+                method: 'POST',
+                headers: {'Content-Type':'application/json'},
+                body: JSON.stringify({ docente_id: docId, materia_id: matId, user_role: currentUser.role })
+            });
+            const data = await res.json();
+            if (res.ok) {
+                if (!silencioso) alert(data.message);
+                // Recargar vista previa
+                if(pendingContratoPayload) window.generarContrato(pendingContratoPayload.docente_id, pendingContratoPayload.nombre);
+                loadContratosFromDatabase(); // Actualizar tabla de auditoría
+            } else {
+                alert("Error: " + data.message);
+            }
+        } catch(e) {
+            alert("Error de red al anular contrato");
         }
     };
 

@@ -27,13 +27,14 @@ public class MateriaController {
                    COALESCE(c.siglas, 'N/A') as carrera,
                    MAX(COALESCE(a.horas, 0)) as horas,
                    MAX(a.nivel_pago) as nivel_pago,
-                   MAX(d.grado_acad) as grado
+                   MAX(d.grado_acad) as grado,
+                   EXISTS(SELECT 1 FROM contrato_emitido ce WHERE ce.docente_id = a.docente_id AND ce.materia_id = m.materia_id) as ya_emitido
             FROM Asignacion a
             JOIN Materia m ON a.materia_id = m.materia_id
             LEFT JOIN Carrera c ON m.carrera_id = c.carrera_id
             JOIN Docente d ON a.docente_id = d.docente_id
             WHERE a.docente_id = ?
-            GROUP BY m.materia_id, m.nombre, c.siglas
+            GROUP BY m.materia_id, m.nombre, c.siglas, a.docente_id
             ORDER BY m.nombre
             """;
         List<Map<String, Object>> result = jdbcTemplate.queryForList(sql, id);
