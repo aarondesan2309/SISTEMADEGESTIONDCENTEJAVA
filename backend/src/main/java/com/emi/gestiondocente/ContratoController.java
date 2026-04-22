@@ -312,40 +312,41 @@ public class ContratoController {
     // y end).
     private String replaceMergeField(String xml, String fieldName, String value) {
         String searchKey = "MERGEFIELD " + fieldName;
-        int searchFrom = 0;
         String valEscaped = escapeXml(value);
+        int searchFrom = 0;
 
         while (true) {
-            int mergePos = xml.indexOf(searchKey, searchFrom);
-            if (mergePos == -1) break;
+            int instrPos = xml.indexOf(searchKey, searchFrom);
+            if (instrPos == -1) break;
 
-            int sepPos = xml.indexOf("w:fldCharType=\"separate\"", mergePos);
-            int endPos = xml.indexOf("w:fldCharType=\"end\"", mergePos);
+            // Encontrar el inicio del campo (fldChar begin)
+            int beginPos = xml.lastIndexOf("<w:fldChar w:fldCharType=\"begin\"", instrPos);
+            // Encontrar el fin del campo (fldChar end)
+            int endTagPos = xml.indexOf("w:fldCharType=\"end\"", instrPos);
 
-            if (sepPos == -1 || endPos == -1 || sepPos >= endPos) {
-                searchFrom = mergePos + 1;
+            if (beginPos == -1 || endTagPos == -1 || beginPos >= endTagPos) {
+                searchFrom = instrPos + 1;
                 continue;
             }
 
-            // Encontrar el final del tag "separate" para empezar a limpiar justo después
-            int sepTagEnd = xml.indexOf(">", sepPos);
-            if (sepTagEnd == -1 || sepTagEnd >= endPos) {
-                searchFrom = mergePos + 1;
-                continue;
-            }
+            // Intentar encontrar los límites de las etiquetas XML completas
+            int realBegin = xml.lastIndexOf("<w:r", beginPos); // Empezar desde el run que contiene el begin
+            if (realBegin == -1) realBegin = beginPos;
 
-            // La "zona de visualización" es lo que está entre el tag separate y el tag end
-            String prefix = xml.substring(0, sepTagEnd + 1);
-            String suffix = xml.substring(endPos);
+            int endClose = xml.indexOf("/>", endTagPos);
+            if (endClose == -1) endClose = xml.indexOf("</w:fldChar>", endTagPos);
             
-            // Creamos un nuevo contenido para la zona que sea EXACTAMENTE un solo <w:t>
-            // preservando espacios y con el valor nuevo.
-            String newDisplayZone = "<w:r><w:t xml:space=\"preserve\">" + valEscaped + "</w:t></w:r>";
+            int realEnd = xml.indexOf("</w:r>", endClose);
+            if (realEnd == -1) realEnd = xml.indexOf(">", endClose) + 1;
+            else realEnd += 6; // incluir </w:r>
 
-            xml = prefix + newDisplayZone + suffix;
-            
-            // Avanzar el puntero de búsqueda
-            searchFrom = prefix.length() + newDisplayZone.length();
+            // Reemplazar TODA la estructura por un simple Run con el texto
+            String prefix = xml.substring(0, realBegin);
+            String suffix = xml.substring(realEnd);
+            String newNode = "<w:r><w:t xml:space=\"preserve\">" + valEscaped + "</w:t></w:r>";
+
+            xml = prefix + newNode + suffix;
+            searchFrom = prefix.length() + newNode.length();
         }
         return xml;
     }
