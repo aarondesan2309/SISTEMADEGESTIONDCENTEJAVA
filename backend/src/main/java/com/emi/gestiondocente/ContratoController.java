@@ -316,48 +316,36 @@ public class ContratoController {
         int searchFrom = 0;
 
         while (true) {
+            // 1. Localizar la instrucción del campo
             int instrPos = xml.indexOf(searchKey, searchFrom);
             if (instrPos == -1) break;
 
-            // 1. Vaciar la instrucción para que Word no muestre el código
-            int startInstr = xml.lastIndexOf("<w:instrText", instrPos);
-            int endInstr = xml.indexOf("</w:instrText>", instrPos);
-            if (startInstr != -1 && endInstr != -1) {
-                int openTagEnd = xml.indexOf(">", startInstr);
-                xml = xml.substring(0, openTagEnd + 1) + " " + xml.substring(endInstr);
-                // No actualizamos searchFrom aquí, seguimos buscando los delimitadores
-            }
+            // 2. Localizar el inicio del campo (fldChar begin)
+            int beginIdx = xml.lastIndexOf("<w:fldChar w:fldCharType=\"begin\"", instrPos);
+            // 3. Localizar el fin del campo (fldChar end)
+            int endIdx = xml.indexOf("w:fldCharType=\"end\"", instrPos);
 
-            // 2. Encontrar los delimitadores de la zona de visualización
-            int sepPos = xml.indexOf("w:fldCharType=\"separate\"", searchFrom);
-            int endPos = xml.indexOf("w:fldCharType=\"end\"", searchFrom);
-
-            if (sepPos != -1 && endPos != -1 && sepPos < endPos) {
-                // Reemplazar contenido de los tags <w:t> dentro de esta zona
-                int zonePtr = sepPos;
-                boolean firstT = true;
-                while (true) {
-                    int tOpen = xml.indexOf("<w:t", zonePtr);
-                    if (tOpen == -1 || tOpen >= endPos) break;
-
-                    int tOpenEnd = xml.indexOf(">", tOpen);
-                    int tClose = xml.indexOf("</w:t>", tOpen);
-                    if (tClose == -1) break;
-
-                    String replacement = firstT ? valEscaped : "";
-                    int oldLen = tClose - (tOpenEnd + 1);
-                    xml = xml.substring(0, tOpenEnd + 1) + replacement + xml.substring(tClose);
-                    
-                    // Ajustar punteros por el cambio de longitud
-                    int diff = replacement.length() - oldLen;
-                    endPos += diff;
-                    zonePtr = tOpenEnd + 1 + replacement.length() + 6;
-                    firstT = false;
-                }
-                searchFrom = endPos + 1;
-            } else {
+            if (beginIdx == -1 || endIdx == -1 || beginIdx > endIdx) {
                 searchFrom = instrPos + 1;
+                continue;
             }
+
+            // 4. Encontrar el cierre de la etiqueta fldChar del end (el ">" final)
+            int endClose = xml.indexOf(">", endIdx);
+            if (endClose == -1) {
+                searchFrom = instrPos + 1;
+                continue;
+            }
+            int realEnd = endClose + 1;
+
+            // 5. REEMPLAZO RADICAL: Sustituir todo el bloque del campo por una etiqueta de texto básica.
+            // Al dejarlo dentro de los posibles tags <w:r> existentes, mantenemos el XML válido.
+            xml = xml.substring(0, beginIdx) + 
+                  "<w:t xml:space=\"preserve\">" + valEscaped + "</w:t>" + 
+                  xml.substring(realEnd);
+            
+            // Avanzar el puntero de búsqueda
+            searchFrom = beginIdx + valEscaped.length();
         }
         return xml;
     }
