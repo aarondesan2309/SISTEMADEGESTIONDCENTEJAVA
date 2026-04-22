@@ -59,12 +59,12 @@ public class ContratoController {
             }
 
             // Validar permiso de carrera (opcional pero recomendado)
-            if (userRole != null && !userRole.equalsIgnoreCase("ADMIN") && !userRole.equalsIgnoreCase("DIRECTOR")) {
-                String carreraMateria = jdbcTemplate.queryForObject(
-                        "SELECT c.nombre FROM materia m JOIN carrera c ON m.carrera_id = c.carrera_id WHERE m.materia_id = ?",
+            if (userRole != null && !userRole.equalsIgnoreCase("ADM") && !userRole.equalsIgnoreCase("DIRECTOR")) {
+                String siglasCarrera = jdbcTemplate.queryForObject(
+                        "SELECT c.siglas FROM materia m JOIN carrera c ON m.carrera_id = c.carrera_id WHERE m.materia_id = ?",
                         String.class, materiaId);
-                if (carreraMateria != null && !carreraMateria.equalsIgnoreCase(userRole)) {
-                    return ResponseEntity.status(403).body(Map.of("message", "No tienes permiso para anular contratos de la carrera " + carreraMateria));
+                if (siglasCarrera != null && !siglasCarrera.equalsIgnoreCase(userRole)) {
+                    return ResponseEntity.status(403).body(Map.of("message", "No tienes permiso para anular contratos de la carrera " + siglasCarrera));
                 }
             }
 
