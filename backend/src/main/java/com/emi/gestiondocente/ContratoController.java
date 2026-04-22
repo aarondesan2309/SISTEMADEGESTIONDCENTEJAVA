@@ -24,8 +24,10 @@ public class ContratoController {
     private JdbcTemplate jdbcTemplate;
 
     // ✅ FIX 1: Ruta de plantilla configurable via variable de entorno o propiedad.
-    // Agrega en application.properties: contrato.template.path=C:/temp/gestion-docente-web/MAR-AGO26 (2).docx
-    // O define la variable de entorno CONTRATO_TEMPLATE_PATH antes de iniciar la app.
+    // Agrega en application.properties:
+    // contrato.template.path=C:/temp/gestion-docente-web/MAR-AGO26 (2).docx
+    // O define la variable de entorno CONTRATO_TEMPLATE_PATH antes de iniciar la
+    // app.
     private static final String TEMPLATE_PATH = System.getenv("CONTRATO_TEMPLATE_PATH") != null
             ? System.getenv("CONTRATO_TEMPLATE_PATH")
             : "C:\\temp\\gestion-docente-web\\MAR-AGO26 (2).docx";
@@ -96,21 +98,23 @@ public class ContratoController {
                         "SELECT m.carrera_id FROM materia m WHERE m.materia_id = ?", Integer.class, materiaId);
                 String siglasCarrera = jdbcTemplate.queryForObject(
                         "SELECT siglas FROM carrera WHERE carrera_id = ?", String.class, carreraMateria);
-                
+
                 if (siglasCarrera == null || !siglasCarrera.equalsIgnoreCase(userRole)) {
                     return ResponseEntity.status(403)
-                            .body(Collections.singletonMap("message", "No tienes permisos para generar contratos de la carrera " + siglasCarrera));
+                            .body(Collections.singletonMap("message",
+                                    "No tienes permisos para generar contratos de la carrera " + siglasCarrera));
                 }
             }
 
             // Validar si ya existe un contrato para esta materia y docente
             Integer contratoExistente = jdbcTemplate.queryForObject(
-                    "SELECT COUNT(*) FROM contrato_emitido WHERE docente_id = ? AND materia_id = ?", 
+                    "SELECT COUNT(*) FROM contrato_emitido WHERE docente_id = ? AND materia_id = ?",
                     Integer.class, docId, materiaId);
-            
+
             if (contratoExistente != null && contratoExistente > 0) {
                 return ResponseEntity.badRequest()
-                        .body(Collections.singletonMap("message", "Ya se ha generado un contrato para esta materia anteriormente."));
+                        .body(Collections.singletonMap("message",
+                                "Ya se ha generado un contrato para esta materia anteriormente."));
             }
 
             // Validar regla de las 80 horas
@@ -135,13 +139,14 @@ public class ContratoController {
                                 "El docente no tiene horas asignadas en esta materia."));
             }
 
-            // ✅ FIX 5: Verificar que la plantilla .docx existe en disco antes de intentar leerla.
+            // ✅ FIX 5: Verificar que la plantilla .docx existe en disco antes de intentar
+            // leerla.
             File templateFile = new File(TEMPLATE_PATH);
             if (!templateFile.exists() || !templateFile.isFile()) {
                 return ResponseEntity.internalServerError()
                         .body(Collections.singletonMap("message",
                                 "No se encontró la plantilla Word en: " + TEMPLATE_PATH +
-                                ". Verifica que el archivo exista o configura la variable CONTRATO_TEMPLATE_PATH."));
+                                        ". Verifica que el archivo exista o configura la variable CONTRATO_TEMPLATE_PATH."));
             }
 
             Integer newId = jdbcTemplate.queryForObject(
@@ -151,7 +156,8 @@ public class ContratoController {
             // ✅ FIX 6: Protección contra newId null (fallo silencioso de la BD).
             if (newId == null) {
                 return ResponseEntity.internalServerError()
-                        .body(Collections.singletonMap("message", "Error al registrar el contrato en la base de datos."));
+                        .body(Collections.singletonMap("message",
+                                "Error al registrar el contrato en la base de datos."));
             }
 
             String folio = "E.M.Ingría. " + (230 + newId);
@@ -159,26 +165,27 @@ public class ContratoController {
 
             Map<String, Object> docente = jdbcTemplate.queryForMap(
                     "SELECT d.nombre, d.rfc, d.curp, d.grado_acad, d.condicion, d.genero, " +
-                    "d.domicilio, d.credencial_ine, d.regimen_sat, " +
-                    "string_agg(DISTINCT c.siglas, ', ') as carrera " +
-                    "FROM docente d " +
-                    "LEFT JOIN asignacion a ON d.docente_id = a.docente_id " +
-                    "LEFT JOIN materia m ON a.materia_id = m.materia_id " +
-                    "LEFT JOIN carrera c ON m.carrera_id = c.carrera_id " +
-                    "WHERE d.docente_id = ? GROUP BY d.docente_id",
+                            "d.domicilio, d.credencial_ine, d.regimen_sat, " +
+                            "string_agg(DISTINCT c.siglas, ', ') as carrera " +
+                            "FROM docente d " +
+                            "LEFT JOIN asignacion a ON d.docente_id = a.docente_id " +
+                            "LEFT JOIN materia m ON a.materia_id = m.materia_id " +
+                            "LEFT JOIN carrera c ON m.carrera_id = c.carrera_id " +
+                            "WHERE d.docente_id = ? GROUP BY d.docente_id",
                     docId);
 
             // Filtrar SOLO por la materia seleccionada
             List<Map<String, Object>> materias = jdbcTemplate.queryForList(
                     "SELECT m.nombre as materia, a.horas, a.nivel_pago " +
-                    "FROM asignacion a JOIN materia m ON a.materia_id = m.materia_id " +
-                    "WHERE a.docente_id = ? AND m.materia_id = ? AND a.horas > 0",
+                            "FROM asignacion a JOIN materia m ON a.materia_id = m.materia_id " +
+                            "WHERE a.docente_id = ? AND m.materia_id = ? AND a.horas > 0",
                     docId, materiaId);
 
             Map<String, String> replacements = buildReplacements(docente, materias, folio);
             byte[] docxBytes = modifyZip(TEMPLATE_PATH, replacements);
 
-            // ✅ FIX 7: Nombre de archivo seguro — elimina caracteres problemáticos incluyendo acentos y ñ.
+            // ✅ FIX 7: Nombre de archivo seguro — elimina caracteres problemáticos
+            // incluyendo acentos y ñ.
             String nombreLimpio = docente.get("nombre").toString()
                     .replaceAll("[áàäâ]", "a").replaceAll("[ÁÀÄÂ]", "A")
                     .replaceAll("[éèëê]", "e").replaceAll("[ÉÈËÊ]", "E")
@@ -188,8 +195,9 @@ public class ContratoController {
                     .replaceAll("[ñ]", "n").replaceAll("[Ñ]", "N")
                     .replaceAll("[^a-zA-Z0-9_\\- ]", "")
                     .replaceAll("\\s+", "_").trim();
-            String fileName = "Contrato_" + nombreLimpio + "_" + 
-                               (materias.isEmpty() ? "Materia" : materias.get(0).get("materia").toString().replace(" ", "_")) + ".docx";
+            String fileName = "Contrato_" + nombreLimpio + "_" +
+                    (materias.isEmpty() ? "Materia" : materias.get(0).get("materia").toString().replace(" ", "_"))
+                    + ".docx";
 
             return ResponseEntity.ok()
                     .contentType(MediaType.parseMediaType(
@@ -204,12 +212,13 @@ public class ContratoController {
         }
     }
 
-    // ✅ FIX 8: modifyZip ahora lee la plantilla desde FileInputStream de forma robusta,
-    //    y usa xml:space="preserve" en los <w:t> de reemplazo para no perder espacios.
+    // ✅ FIX 8: modifyZip ahora lee la plantilla desde FileInputStream de forma
+    // robusta,
+    // y usa xml:space="preserve" en los <w:t> de reemplazo para no perder espacios.
     private byte[] modifyZip(String path, Map<String, String> replacements) throws IOException {
         ByteArrayOutputStream baos = new ByteArrayOutputStream();
         try (ZipInputStream zis = new ZipInputStream(new FileInputStream(path));
-             ZipOutputStream zos = new ZipOutputStream(baos)) {
+                ZipOutputStream zos = new ZipOutputStream(baos)) {
 
             ZipEntry entry;
             while ((entry = zis.getNextEntry()) != null) {
@@ -227,26 +236,32 @@ public class ContratoController {
                         content = content.replace("\u00AB" + key + "\u00BB", val);
                         // Reemplazar versión escapada en XML &lt;&lt;campo&gt;&gt;
                         content = content.replace("&lt;&lt;" + key + "&gt;&gt;", val);
+                    }
 
-                        // ✅ FIX 9: Reemplazar MERGEFIELDs — el nombre puede aparecer
-                        // fragmentado entre etiquetas XML. Primero normalizamos el XML
-                        // para reagrupar los fragmentos del nombre del campo.
-                        if (content.contains("MERGEFIELD") && content.contains(key)) {
-                            content = replaceMergeField(content, key, val);
+                    // ✅ FIX 9: Reemplazar MERGEFIELDs
+                    if (name.endsWith(".xml")) {
+                        String xml = content; // Usar el content ya procesado por chevrones
+                        for (Map.Entry<String, String> entryReplacement : replacements.entrySet()) {
+                            xml = replaceMergeField(xml, entryReplacement.getKey(), entryReplacement.getValue());
                         }
-                    }
 
-                    // Limpiar la sección mailMerge del settings.xml para evitar que Word
-                    // pida reconectar el origen de datos al abrir el documento.
-                    if (name.equals("word/settings.xml")) {
-                        content = content.replaceAll("(?s)<w:mailMerge>.*?</w:mailMerge>", "");
-                    }
+                        // Limpiar mailMerge en settings.xml
+                        if (name.equals("word/settings.xml")) {
+                            xml = xml.replaceAll("(?s)<w:mailMerge>.*?</w:mailMerge>", "");
+                        }
 
+                        // ✅ CORRECCIÓN: Eliminar typos heredados de la plantilla
+                        xml = xml.replace("Prestadoro", "Prestador")
+                                 .replace("prestadoro", "prestador")
+                                 .replace("Quarta", "Cuarta")
+                                 .replace("quarta", "cuarta");
+
+                        content = xml;
+                    }
                     bytes = content.getBytes(StandardCharsets.UTF_8);
                 }
 
                 // ✅ FIX 10: Crear la ZipEntry sin copiar metadatos del original
-                //    (tamaño comprimido, CRC, etc.) para evitar corrupción del ZIP.
                 ZipEntry outEntry = new ZipEntry(name);
                 zos.putNextEntry(outEntry);
                 zos.write(bytes);
@@ -258,66 +273,57 @@ public class ContratoController {
     }
 
     // ✅ FIX 11: replaceMergeField mejorado.
-    //    Problema original: Word fragmenta el XML de los MERGEFIELD en múltiples <w:r> y
-    //    <w:t>; el método anterior fallaba cuando el nombre del campo quedaba partido entre
-    //    tags. Este método busca la secuencia completa fldChar begin → instrText → separate
-    //    → w:t → end y reemplaza TODOS los <w:t> en la zona "display" (entre separate y end).
+    // Problema original: Word fragmenta el XML de los MERGEFIELD en múltiples <w:r>
+    // y
+    // <w:t>; el método anterior fallaba cuando el nombre del campo quedaba partido
+    // entre
+    // tags. Este método busca la secuencia completa fldChar begin → instrText →
+    // separate
+    // → w:t → end y reemplaza TODOS los <w:t> en la zona "display" (entre separate
+    // y end).
     private String replaceMergeField(String xml, String fieldName, String value) {
         String searchKey = "MERGEFIELD " + fieldName;
         int searchFrom = 0;
+        String valEscaped = escapeXml(value);
 
         while (true) {
             int mergePos = xml.indexOf(searchKey, searchFrom);
             if (mergePos == -1) break;
 
-            // Buscar el fldChar "separate" y "end" MÁS CERCANOS después de la instrucción
             int sepPos = xml.indexOf("w:fldCharType=\"separate\"", mergePos);
             int endPos = xml.indexOf("w:fldCharType=\"end\"", mergePos);
 
-            // Protección: si no encontramos los delimitadores, salir del loop
             if (sepPos == -1 || endPos == -1 || sepPos >= endPos) {
                 searchFrom = mergePos + 1;
                 continue;
             }
 
-            // Reemplazar TODOS los <w:t ...>...</w:t> entre "separate" y "end"
-            // (puede haber más de uno si el valor anterior tenía formato)
-            StringBuilder zone = new StringBuilder(xml.substring(sepPos, endPos));
-            int offset = 0;
-            while (true) {
-                int tOpen = zone.indexOf("<w:t", offset);
-                if (tOpen == -1) break;
-                int tOpenEnd = zone.indexOf(">", tOpen);
-                if (tOpenEnd == -1) break;
-                int tClose = zone.indexOf("</w:t>", tOpenEnd);
-                if (tClose == -1) break;
-
-                // Solo reemplazamos el PRIMER <w:t> con el valor real;
-                // los siguientes los vaciamos para no duplicar el contenido.
-                String replacement = (offset == 0) ? value : "";
-
-                // Asegurar xml:space="preserve" para respetar espacios
-                String openTag = zone.substring(tOpen, tOpenEnd + 1);
-                if (!openTag.contains("xml:space")) {
-                    openTag = openTag.replace("<w:t", "<w:t xml:space=\"preserve\"");
-                }
-
-                String before = zone.substring(0, tOpen);
-                String after = zone.substring(tClose);
-                zone = new StringBuilder(before + openTag + replacement + after);
-                offset = before.length() + openTag.length() + replacement.length();
+            // Encontrar el final del tag "separate" para empezar a limpiar justo después
+            int sepTagEnd = xml.indexOf(">", sepPos);
+            if (sepTagEnd == -1 || sepTagEnd >= endPos) {
+                searchFrom = mergePos + 1;
+                continue;
             }
 
-            xml = xml.substring(0, sepPos) + zone + xml.substring(endPos);
+            // La "zona de visualización" es lo que está entre el tag separate y el tag end
+            String prefix = xml.substring(0, sepTagEnd + 1);
+            String suffix = xml.substring(endPos);
+            
+            // Creamos un nuevo contenido para la zona que sea EXACTAMENTE un solo <w:t>
+            // preservando espacios y con el valor nuevo.
+            String newDisplayZone = "<w:r><w:t xml:space=\"preserve\">" + valEscaped + "</w:t></w:r>";
 
-            // Avanzar más allá del bloque que acabamos de procesar
-            searchFrom = sepPos + zone.length();
+            xml = prefix + newDisplayZone + suffix;
+            
+            // Avanzar el puntero de búsqueda
+            searchFrom = prefix.length() + newDisplayZone.length();
         }
         return xml;
     }
 
     private String escapeXml(String s) {
-        if (s == null) return "";
+        if (s == null)
+            return "";
         return s.replace("&", "&amp;")
                 .replace("<", "&lt;")
                 .replace(">", "&gt;")
@@ -326,8 +332,8 @@ public class ContratoController {
     }
 
     private Map<String, String> buildReplacements(Map<String, Object> doc,
-                                                   List<Map<String, Object>> materias,
-                                                   String folio) {
+            List<Map<String, Object>> materias,
+            String folio) {
         Map<String, String> r = new HashMap<>();
         NumberFormat nf = NumberFormat.getNumberInstance(new Locale("es", "MX"));
         nf.setMinimumFractionDigits(2);
@@ -337,9 +343,11 @@ public class ContratoController {
         boolean f = "F".equalsIgnoreCase(gen);
 
         // ✅ FIX 12: Si regimen_sat está vacío o es null, defaultear a "SP"
-        //    (Servicios Profesionales) que es el caso más común en docentes por honorarios.
+        // (Servicios Profesionales) que es el caso más común en docentes por
+        // honorarios.
         String reg = val(doc, "regimen_sat");
-        if (reg == null || reg.trim().isEmpty()) reg = "SP";
+        if (reg == null || reg.trim().isEmpty())
+            reg = "SP";
 
         // --- Datos personales ---
         r.put("NOMBRE", val(doc, "nombre"));
@@ -373,36 +381,38 @@ public class ContratoController {
         r.put("Una_Un_prestador", f ? "una" : "un");
 
         // --- Carrera ---
-      //  r.put("CARRERA", val(doc, "carrera"));
+        // r.put("CARRERA", val(doc, "carrera"));
         String carreraRaw = val(doc, "carrera");
-    StringBuilder carreraFinal = new StringBuilder();
+        StringBuilder carreraFinal = new StringBuilder();
 
-    if (carreraRaw != null) {
-     String[] carreras = carreraRaw.split(",");
+        if (carreraRaw != null) {
+            String[] carreras = carreraRaw.split(",");
 
-    for (String c : carreras) {
-        String cc = c.trim();
-        String nombre = switch (cc) {
-            case "ICI" -> "Ingeniero en Computación e Informática";
-            case "IC"  -> "Ingeniero Constructor Militar";
-            case "ICE" -> "Ingeniero en Comunicaciones y Electrónica";
-            case "II"  -> "Ingeniero Industrial";
-            default -> cc;
-        };
+            for (String c : carreras) {
+                String cc = c.trim();
+                String nombre = switch (cc) {
+                    case "ICI" -> "Ingeniero en Computación e Informática";
+                    case "IC" -> "Ingeniero Constructor Militar";
+                    case "ICE" -> "Ingeniero en Comunicaciones y Electrónica";
+                    case "II" -> "Ingeniero Industrial";
+                    default -> cc;
+                };
 
-        if (carreraFinal.length() > 0) carreraFinal.append(", ");
-        carreraFinal.append(nombre);
-    }
-}
+                if (carreraFinal.length() > 0)
+                    carreraFinal.append(", ");
+                carreraFinal.append(nombre);
+            }
+        }
 
-r.put("CARRERA", carreraFinal.toString());
+        r.put("CARRERA", carreraFinal.toString());
         // --- Materias y horas ---
         StringBuilder msb = new StringBuilder();
         BigDecimal th = BigDecimal.ZERO;
         String nivel = "Licenciatura"; // nivel por defecto
 
         for (Map<String, Object> m : materias) {
-            if (msb.length() > 0) msb.append(", ");
+            if (msb.length() > 0)
+                msb.append(", ");
             msb.append(val(m, "materia"));
 
             Object horasObj = m.get("horas");
@@ -429,14 +439,14 @@ r.put("CARRERA", carreraFinal.toString());
         switch (nivel.toLowerCase()) {
             case "maestría":
             case "maestria":
-                thora = new BigDecimal("851.75");
+                thora = new BigDecimal("734.27");
                 break;
             case "técnico":
             case "tecnico":
-                thora = new BigDecimal("231.19");
+                thora = new BigDecimal("199.30");
                 break;
             default: // Licenciatura
-                thora = new BigDecimal("486.71");
+                thora = new BigDecimal("419.58");
                 break;
         }
         r.put("POR_HORA", "$" + nf.format(thora));
@@ -444,18 +454,19 @@ r.put("CARRERA", carreraFinal.toString());
 
         // --- Cálculos fiscales ---
         BigDecimal bruto = th.multiply(thora).setScale(2, RoundingMode.HALF_UP);
-        BigDecimal iva   = BigDecimal.ZERO;
-        BigDecimal riva  = BigDecimal.ZERO;
+        BigDecimal iva = BigDecimal.ZERO;
+        BigDecimal riva = BigDecimal.ZERO;
         BigDecimal risr;
 
         // ✅ FIX 13: Lógica fiscal corregida con los tres regímenes SAT:
-        //   SP  = Servicios Profesionales (honorarios) → genera IVA 16%, retención IVA 2/3, ISR 10%
-        //   RESICO = Régimen Simplificado de Confianza → NO genera IVA, ISR 1.25%
-        //   RS  = Sueldos y Salarios (asimilados) → NO genera IVA, ISR 10%
+        // SP = Servicios Profesionales (honorarios) → genera IVA 16%, retención IVA
+        // 2/3, ISR 10%
+        // RESICO = Régimen Simplificado de Confianza → NO genera IVA, ISR 1.25%
+        // RS = Sueldos y Salarios (asimilados) → NO genera IVA, ISR 10%
         boolean esServiciosProfesionales = !"RS".equalsIgnoreCase(reg) && !"RESICO".equalsIgnoreCase(reg);
 
         if (esServiciosProfesionales) {
-            iva  = bruto.multiply(new BigDecimal("0.16")).setScale(2, RoundingMode.HALF_UP);
+            iva = bruto.multiply(new BigDecimal("0.16")).setScale(2, RoundingMode.HALF_UP);
             riva = bruto.multiply(new BigDecimal("0.106667")).setScale(2, RoundingMode.HALF_UP);
         }
         // RESICO: tasa reducida 1.25%; SP y RS: 10%
@@ -468,25 +479,26 @@ r.put("CARRERA", carreraFinal.toString());
 
         // Campos por mes (4 meses de contrato)
         for (int i = 1; i <= 4; i++) {
-            r.put("SubtalMes" + i,  "$" + nf.format(bruto));
-            r.put("IvaMes" + i,     "$" + nf.format(iva));
-            r.put("RetISRMes" + i,  "$" + nf.format(risr));
-            r.put("RetIVAMes" + i,  "$" + nf.format(riva));
-            r.put("NetoMes" + i,    "$" + nf.format(neto));
+            r.put("SubtalMes" + i, "$" + nf.format(bruto));
+            r.put("IvaMes" + i, "$" + nf.format(iva));
+            r.put("RetISRMes" + i, "$" + nf.format(risr));
+            r.put("RetIVAMes" + i, "$" + nf.format(riva));
+            r.put("NetoMes" + i, "$" + nf.format(neto));
             r.put("ImpBruto_Mes" + i, "$" + nf.format(bruto));
         }
 
         // Totales 4 meses
         BigDecimal t4 = new BigDecimal("4");
         r.put("TOTAL_RECIBIR", "$" + nf.format(neto.multiply(t4)));
-        r.put("T_SbT",  "$" + nf.format(bruto.multiply(t4)));
-        r.put("T_IVA",  "$" + nf.format(iva.multiply(t4)));
-        r.put("T_ISR",  "$" + nf.format(risr.multiply(t4)));
+        r.put("T_SbT", "$" + nf.format(bruto.multiply(t4)));
+        r.put("T_IVA", "$" + nf.format(iva.multiply(t4)));
+        r.put("T_ISR", "$" + nf.format(risr.multiply(t4)));
         r.put("T_IVA1", "$" + nf.format(riva.multiply(t4)));
-        r.put("T_IB",   "$" + nf.format(bruto.multiply(t4)));
-        r.put("T_IN",   "$" + nf.format(neto.multiply(t4)));
+        r.put("T_IB", "$" + nf.format(bruto.multiply(t4)));
+        r.put("T_IN", "$" + nf.format(neto.multiply(t4)));
 
-        // ✅ FIX 14: LETRA con formato legible (ej. "$ 15,234.56 M.N.") en vez del toPlainString crudo.
+        // ✅ FIX 14: LETRA con formato legible (ej. "$ 15,234.56 M.N.") en vez del
+        // toPlainString crudo.
         r.put("LETRA", "$ " + nf.format(neto.multiply(t4)) + " M.N.");
 
         // --- Datos del periodo contractual ---
@@ -494,14 +506,16 @@ r.put("CARRERA", carreraFinal.toString());
         r.put("FECHA_INICIO", "10 de marzo de 2026");
         r.put("DURACION", "4 meses");
 
-        // ✅ FIX 15: Exponer también el régimen SAT en el documento por si la plantilla lo usa.
+        // ✅ FIX 15: Exponer también el régimen SAT en el documento por si la plantilla
+        // lo usa.
         r.put("REGIMEN_SAT", reg);
 
         return r;
     }
 
-    // ✅ FIX 16: val() acepta tanto Map<String,Object> como cualquier Map para evitar
-    //    unchecked cast en las llamadas con materias.
+    // ✅ FIX 16: val() acepta tanto Map<String,Object> como cualquier Map para
+    // evitar
+    // unchecked cast en las llamadas con materias.
     private String val(Map<?, Object> m, String k) {
         Object v = m.get(k);
         return (v != null) ? v.toString().trim() : "";
