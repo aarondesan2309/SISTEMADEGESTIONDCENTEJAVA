@@ -319,29 +319,38 @@ public class ContratoController {
             int instrPos = xml.indexOf(searchKey, searchFrom);
             if (instrPos == -1) break;
 
-            // Encontrar el inicio del campo (fldChar begin)
-            int beginPos = xml.lastIndexOf("<w:fldChar w:fldCharType=\"begin\"", instrPos);
-            // Encontrar el fin del campo (fldChar end)
-            int endTagPos = xml.indexOf("w:fldCharType=\"end\"", instrPos);
+            // Buscar el inicio del campo (fldChar begin)
+            int beginPos = xml.lastIndexOf("w:fldCharType=\"begin\"", instrPos);
+            // Buscar el fin del campo (fldChar end)
+            int endPos = xml.indexOf("w:fldCharType=\"end\"", instrPos);
 
-            if (beginPos == -1 || endTagPos == -1 || beginPos >= endTagPos) {
+            if (beginPos == -1 || endPos == -1 || beginPos >= endPos) {
                 searchFrom = instrPos + 1;
                 continue;
             }
 
-            // Intentar encontrar los límites de las etiquetas XML completas
-            int realBegin = xml.lastIndexOf("<w:r", beginPos); // Empezar desde el run que contiene el begin
-            if (realBegin == -1) realBegin = beginPos;
+            // Encontrar el inicio real de la etiqueta <w:fldChar del begin
+            int realStart = xml.lastIndexOf("<", beginPos);
+            // Encontrar el cierre real de la etiqueta </w:fldChar> o /> del end
+            int endTagClose = xml.indexOf(">", endPos);
+            if (endTagClose == -1) {
+                searchFrom = instrPos + 1;
+                continue;
+            }
+            int realEnd = endTagClose + 1;
 
-            int endClose = xml.indexOf("/>", endTagPos);
-            if (endClose == -1) endClose = xml.indexOf("</w:fldChar>", endTagPos);
-            
-            int realEnd = xml.indexOf("</w:r>", endClose);
-            if (realEnd == -1) realEnd = xml.indexOf(">", endClose) + 1;
-            else realEnd += 6; // incluir </w:r>
+            // OPCIONAL: Intentar expandir a los límites de <w:r> para una limpieza total
+            int rStart = xml.lastIndexOf("<w:r", realStart);
+            if (rStart != -1 && (realStart - rStart) < 20) {
+                realStart = rStart;
+            }
+            int rEnd = xml.indexOf("</w:r>", realEnd);
+            if (rEnd != -1 && (rEnd - realEnd) < 20) {
+                realEnd = rEnd + 6;
+            }
 
-            // Reemplazar TODA la estructura por un simple Run con el texto
-            String prefix = xml.substring(0, realBegin);
+            // Reemplazar la estructura por texto plano envuelto en un Run básico
+            String prefix = xml.substring(0, realStart);
             String suffix = xml.substring(realEnd);
             String newNode = "<w:r><w:t xml:space=\"preserve\">" + valEscaped + "</w:t></w:r>";
 
