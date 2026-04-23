@@ -481,54 +481,68 @@ public class ContratoController {
         r.put("POR_HORA", "$" + nf.format(thora));
         r.put("IMP_HS", "$" + nf.format(thora));
 
-        // --- Cálculos fiscales ---
-        BigDecimal bruto = th.multiply(thora).setScale(2, RoundingMode.HALF_UP);
-        BigDecimal iva = BigDecimal.ZERO;
-        BigDecimal riva = BigDecimal.ZERO;
-        BigDecimal risr;
+        // --- Cálculos fiscales (Basados en 4 meses de contrato) ---
+        BigDecimal divisorMeses = new BigDecimal("4");
+        BigDecimal thMes = th.divide(divisorMeses, 2, RoundingMode.HALF_UP);
+        
+        BigDecimal brutoMensual = thMes.multiply(thora).setScale(2, RoundingMode.HALF_UP);
+        BigDecimal ivaMensual = BigDecimal.ZERO;
+        BigDecimal rivaMensual = BigDecimal.ZERO;
+        BigDecimal risrMensual;
 
-        // ✅ FIX 13: Lógica fiscal corregida con los tres regímenes SAT:
-        // SP = Servicios Profesionales (honorarios) → genera IVA 16%, retención IVA
-        // 2/3, ISR 10%
-        // RESICO = Régimen Simplificado de Confianza → NO genera IVA, ISR 1.25%
-        // RS = Sueldos y Salarios (asimilados) → NO genera IVA, ISR 10%
         boolean esServiciosProfesionales = !"RS".equalsIgnoreCase(reg) && !"RESICO".equalsIgnoreCase(reg);
 
         if (esServiciosProfesionales) {
-            iva = bruto.multiply(new BigDecimal("0.16")).setScale(2, RoundingMode.HALF_UP);
-            riva = bruto.multiply(new BigDecimal("0.106667")).setScale(2, RoundingMode.HALF_UP);
+            ivaMensual = brutoMensual.multiply(new BigDecimal("0.16")).setScale(2, RoundingMode.HALF_UP);
+            rivaMensual = brutoMensual.multiply(new BigDecimal("0.106667")).setScale(2, RoundingMode.HALF_UP);
         }
-        // RESICO: tasa reducida 1.25%; SP y RS: 10%
-        BigDecimal tasaIsr = "RESICO".equalsIgnoreCase(reg)
-                ? new BigDecimal("0.0125")
-                : new BigDecimal("0.10");
-        risr = bruto.multiply(tasaIsr).setScale(2, RoundingMode.HALF_UP);
+        
+        BigDecimal tasaIsr = "RESICO".equalsIgnoreCase(reg) ? new BigDecimal("0.0125") : new BigDecimal("0.10");
+        risrMensual = brutoMensual.multiply(tasaIsr).setScale(2, RoundingMode.HALF_UP);
 
-        BigDecimal neto = bruto.add(iva).subtract(riva).subtract(risr);
+        BigDecimal netoMensual = brutoMensual.add(ivaMensual).subtract(rivaMensual).subtract(risrMensual);
 
-        // Campos por mes (4 meses de contrato)
+        // Campos por mes
         for (int i = 1; i <= 4; i++) {
-            r.put("SubtalMes" + i, "$" + nf.format(bruto));
-            r.put("IvaMes" + i, "$" + nf.format(iva));
-            r.put("RetISRMes" + i, "$" + nf.format(risr));
-            r.put("RetIVAMes" + i, "$" + nf.format(riva));
-            r.put("NetoMes" + i, "$" + nf.format(neto));
-            r.put("ImpBruto_Mes" + i, "$" + nf.format(bruto));
+            r.put("HsMes" + i, thMes.stripTrailingZeros().toPlainString());
+            r.put("SubtalMes" + i, "$" + nf.format(brutoMensual));
+            r.put("IvaMes" + i, "$" + nf.format(ivaMensual));
+            r.put("RetISRMes" + i, "$" + nf.format(risrMensual));
+            r.put("RetIVAMes" + i, "$" + nf.format(rivaMensual));
+            r.put("NetoMes" + i, "$" + nf.format(netoMensual));
+            r.put("ImpBruto_Mes" + i, "$" + nf.format(brutoMensual));
         }
 
-        // Totales 4 meses
-        BigDecimal t4 = new BigDecimal("4");
-        r.put("TOTAL_RECIBIR", "$" + nf.format(neto.multiply(t4)));
-        r.put("T_SbT", "$" + nf.format(bruto.multiply(t4)));
-        r.put("T_IVA", "$" + nf.format(iva.multiply(t4)));
-        r.put("T_ISR", "$" + nf.format(risr.multiply(t4)));
-        r.put("T_IVA1", "$" + nf.format(riva.multiply(t4)));
-        r.put("T_IB", "$" + nf.format(bruto.multiply(t4)));
-        r.put("T_IN", "$" + nf.format(neto.multiply(t4)));
+        // Totales 4 meses (Sumatoria)
+        BigDecimal brutoTotal = brutoMensual.multiply(divisorMeses);
+        BigDecimal ivaTotal = ivaMensual.multiply(divisorMeses);
+        BigDecimal risrTotal = risrMensual.multiply(divisorMeses);
+        BigDecimal rivaTotal = rivaMensual.multiply(divisorMeses);
+        BigDecimal netoTotal = netoMensual.multiply(divisorMeses);
+
+        r.put("T_HS", th.stripTrailingZeros().toPlainString());
+        r.put("T_SUB", "$" + nf.format(brutoTotal));
+        r.put("T_IVA", "$" + nf.format(ivaTotal));
+        r.put("T_RISR", "$" + nf.format(risrTotal));
+        r.put("T_RIVA", "$" + nf.format(rivaTotal));
+        r.put("T_NET", "$" + nf.format(netoTotal));
+
+        // Otros alias comunes
+        r.put("HORAS", th.stripTrailingZeros().toPlainString());
+        r.put("T_HS", th.stripTrailingZeros().toPlainString());
+        r.put("IMP_BRUTO", "$" + nf.format(brutoTotal));
+        r.put("IMP_NETO", "$" + nf.format(netoTotal));
+        r.put("TOTAL_RECIBIR", "$" + nf.format(netoTotal));
+        r.put("T_SbT", "$" + nf.format(brutoTotal));
+        r.put("T_IVA", "$" + nf.format(ivaTotal));
+        r.put("T_ISR", "$" + nf.format(risrTotal));
+        r.put("T_RIVA", "$" + nf.format(rivaTotal));
+        r.put("T_NET", "$" + nf.format(netoTotal));
+        r.put("T_IN", "$" + nf.format(netoTotal));
 
         // ✅ FIX 14: LETRA con formato legible (ej. "$ 15,234.56 M.N.") en vez del
         // toPlainString crudo.
-        r.put("LETRA", "$ " + nf.format(neto.multiply(t4)) + " M.N.");
+        r.put("LETRA", "$ " + nf.format(netoTotal) + " M.N.");
 
         // --- Datos del periodo contractual ---
         r.put("PERIODO", "Marzo - Junio 2026");
