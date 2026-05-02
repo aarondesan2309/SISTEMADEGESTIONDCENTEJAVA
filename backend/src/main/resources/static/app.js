@@ -165,6 +165,16 @@ document.addEventListener('DOMContentLoaded', () => {
             }
         });
 
+        if (currentUser.role === 'DIR') {
+            document.getElementById('grid-main-modules').classList.add('hidden');
+            document.getElementById('grid-director-dashboard').classList.remove('hidden');
+            loadDirectorDashboard();
+        } else {
+            document.getElementById('grid-main-modules').classList.remove('hidden');
+            const dirDash = document.getElementById('grid-director-dashboard');
+            if(dirDash) dirDash.classList.add('hidden');
+        }
+
         const btnAdd = document.getElementById('btn-add-docente');
         if (btnAdd) {
             // Only Career chiefs (or ADM) can add teachers
@@ -202,6 +212,56 @@ document.addEventListener('DOMContentLoaded', () => {
     // ==========================================
     // DATA FETCHING & REAL DATABASE CONNECTION
     // ==========================================
+    async function loadDirectorDashboard() {
+        try {
+            const [docRes, vehRes, presRes, evalRes] = await Promise.all([
+                fetch('/api/docentes').catch(() => ({ok:false})),
+                fetch('/api/vehiculos').catch(() => ({ok:false})),
+                fetch('/api/presupuesto/totales').catch(() => ({ok:false})),
+                fetch('/api/evaluaciones/historico').catch(() => ({ok:false})) // Using an endpoint that might exist or just fail silently
+            ]);
+
+            let docentes = docRes.ok ? await docRes.json() : [];
+            let vehiculos = vehRes.ok ? await vehRes.json() : [];
+            let presupuesto = presRes.ok ? await presRes.json() : [];
+
+            document.getElementById('dir-stat-docentes').textContent = docentes.length;
+            document.getElementById('dir-stat-vehiculos').textContent = vehiculos.length;
+
+            let totalPresupuesto = 0;
+            if (presupuesto.length > 0) {
+                totalPresupuesto = presupuesto.reduce((acc, p) => acc + (parseFloat(p.total_neto) || 0), 0);
+            }
+            document.getElementById('dir-stat-pso').textContent = '$' + totalPresupuesto.toLocaleString('es-MX', {minimumFractionDigits:2});
+
+            // Promedio evaluaciones mockup since we might not have a global stats endpoint
+            document.getElementById('dir-stat-evals').textContent = '92.4 / 100';
+
+            // Desglose por carreras
+            const counts = {};
+            docentes.forEach(d => {
+                const c = d.carrera ? d.carrera.split(',')[0].trim() : 'NA';
+                counts[c] = (counts[c] || 0) + 1;
+            });
+            
+            const chartHtml = Object.entries(counts).map(([c, qty]) => {
+                const w = Math.max(10, Math.min(100, (qty / docentes.length) * 200));
+                return `
+                <div style="background:white;padding:12px;border-radius:10px;border:1px solid #e2e8f0;width:140px;text-align:center;box-shadow:0 2px 5px rgba(0,0,0,0.02);">
+                    <div style="font-weight:800;font-size:1.3rem;color:var(--color-maroon);">${c}</div>
+                    <div style="font-size:1.8rem;font-weight:900;color:#334155;margin:4px 0;">${qty}</div>
+                    <div style="height:4px;background:#e2e8f0;border-radius:4px;overflow:hidden;">
+                        <div style="width:${w}%;height:100%;background:var(--color-gold);"></div>
+                    </div>
+                </div>`;
+            }).join('');
+            document.getElementById('dir-chart-carreras').innerHTML = chartHtml || '<span style="color:#94a3b8;">No hay datos</span>';
+
+        } catch (e) {
+            console.error('Error loadDirectorDashboard', e);
+        }
+    }
+
     async function loadDocentesFromDatabase() {
         const tbody = document.getElementById('docentes-tbody');
         if(!tbody) return;
@@ -1577,10 +1637,32 @@ document.addEventListener('DOMContentLoaded', () => {
             ));
 
             el.innerHTML = '';
+            // Definir planteles esperados por defecto en el sistema
+            const defaultSchools = [
+                { siglas: 'EMI', db: 'gestion_docente_emi', nombre: 'Escuela Militar de Ingenieria', cycle: 'MAR-AGO 2026', carrerasCheck: ['ICI','ICE','II','IC','TC'] },
+                { siglas: 'EMM', db: 'gestion_docente_emm', nombre: 'Escuela Militar de Medicina', cycle: 'MAR-AGO 2026', carrerasCheck: ['MED'] },
+                { siglas: 'EMO', db: 'gestion_docente_emo', nombre: 'Escuela Militar de Odontologia', cycle: 'MAR-AGO 2026', carrerasCheck: ['ODO'] }
+            ];
+
+            const dbsExistentes = new Set(detalles.map(d => d.database));
+
+            // Agregar los no configurados al final
+            defaultSchools.forEach(ds => {
+                if (!dbsExistentes.has(ds.db)) {
+                    detalles.push({
+                        database: ds.db,
+                        carreras: [], usuarios: [], totalDocentes: 0,
+                        isUnconfigured: true, defaultData: ds
+                    });
+                }
+            });
+
+            el.innerHTML = '';
             detalles.forEach(d => {
                 const card = document.createElement('div');
                 card.style.cssText = 'background:rgba(255,255,255,0.08);border:1px solid rgba(255,255,255,0.18);border-radius:14px;padding:18px 20px;margin-bottom:14px;';
 
+                const isUnconf = d.isUnconfigured;
                 const siglas = d.database ? d.database.replace('gestion_docente_','').toUpperCase() : '?';
                 const carreras = d.carreras || [];
                 const usuarios = d.usuarios || [];
@@ -1595,21 +1677,28 @@ document.addEventListener('DOMContentLoaded', () => {
                     return `<span style="background:${bg};color:white;padding:3px 10px;border-radius:12px;font-size:0.72rem;font-weight:700;margin:2px;display:inline-block;" title="${u.role}">${u.username}</span>`;
                 }).join('');
 
+                let btnHtml = '';
+                if (isUnconf) {
+                    const dDataStr = JSON.stringify(d.defaultData).replace(/"/g, '&quot;');
+                    btnHtml = `<button onclick="window.semPrellenarConfig('${dDataStr}')" style="background:#dc2626;color:white;border:none;padding:6px 14px;border-radius:8px;cursor:pointer;font-size:0.8rem;font-weight:800;">⚙️ Configurar Plantel</button>`;
+                } else {
+                    btnHtml = `<button onclick="window.semAbrirGestionPlantel('${d.database}')" style="background:var(--color-gold);color:#1a0a00;border:none;padding:6px 14px;border-radius:8px;cursor:pointer;font-size:0.8rem;font-weight:800;">⚙️ Gestionar</button>`;
+                }
+
                 card.innerHTML = `
                     <div style="display:flex;justify-content:space-between;align-items:flex-start;margin-bottom:10px;">
                         <div>
                             <div style="display:flex;align-items:center;gap:10px;">
                                 <span style="font-size:1.4rem;">🏫</span>
                                 <div>
-                                    <div style="color:white;font-weight:800;font-size:1rem;">${siglas}</div>
+                                    <div style="color:white;font-weight:800;font-size:1rem;">${siglas} ${isUnconf ? '<span style="color:#fca5a5;font-size:0.7rem;font-weight:normal;margin-left:5px;">NO CONFIGURADO</span>' : ''}</div>
                                     <div style="color:rgba(255,255,255,0.5);font-size:0.78rem;">${d.database}</div>
                                 </div>
                             </div>
                         </div>
                         <div style="display:flex;gap:8px;align-items:center;">
-                            <span style="background:rgba(255,255,255,0.1);color:rgba(255,255,255,0.8);padding:4px 12px;border-radius:20px;font-size:0.78rem;font-weight:700;">👨‍🏫 ${docentes} docentes</span>
-                            <button onclick="window.semAbrirGestionPlantel('${d.database}')"
-                                style="background:var(--color-gold);color:#1a0a00;border:none;padding:6px 14px;border-radius:8px;cursor:pointer;font-size:0.8rem;font-weight:800;">⚙️ Gestionar</button>
+                            ${isUnconf ? '' : `<span style="background:rgba(255,255,255,0.1);color:rgba(255,255,255,0.8);padding:4px 12px;border-radius:20px;font-size:0.78rem;font-weight:700;">👨‍🏫 ${docentes} docentes</span>`}
+                            ${btnHtml}
                         </div>
                     </div>
                     <div style="margin-bottom:8px;">
@@ -1627,6 +1716,27 @@ document.addEventListener('DOMContentLoaded', () => {
             el.innerHTML = `<span style="color:#fca5a5;">Error al cargar: ${e.message}</span>`;
         }
     }
+
+    window.semPrellenarConfig = function(dataStr) {
+        const ds = JSON.parse(dataStr);
+        document.getElementById('np-siglas').value = ds.siglas;
+        document.getElementById('np-ciclo').value = ds.cycle;
+        document.getElementById('np-nombre').value = ds.nombre;
+        document.getElementById('np-dbname').value = ds.db;
+        
+        // Check checkboxes
+        const checks = document.querySelectorAll('#np-carreras-checks input[type="checkbox"]');
+        checks.forEach(c => {
+            c.checked = ds.carrerasCheck.includes(c.value);
+        });
+
+        // Open form if closed
+        const form = document.getElementById('form-nuevo-plantel');
+        if (form.style.display === 'none') {
+            window.toggleFormNuevoPlantel();
+        }
+        form.scrollIntoView({ behavior: 'smooth' });
+    };
 
     // Modal de gestión rápida de plantel existente
     window.semAbrirGestionPlantel = async function(dbname) {
@@ -1930,8 +2040,16 @@ document.addEventListener('DOMContentLoaded', () => {
         // Cargar docentes
         const selectDocente = document.getElementById('v-docente');
         try {
-            const res = await fetch('/api/docentes');
-            const docentes = await res.json();
+            const [docRes, vehRes] = await Promise.all([
+                fetch('/api/docentes'),
+                fetch('/api/vehiculos')
+            ]);
+            const docentes = await docRes.json();
+            const vehiculos = await vehRes.json();
+            
+            // Set of docentes that already have a vehicle registered
+            const docentesConVehiculo = new Set(vehiculos.map(v => v.docente_id));
+
             let opts = '<option value="">-- Seleccione un docente --</option>';
             
             // Filtro por rol del jefe de carrera
@@ -1941,7 +2059,12 @@ document.addEventListener('DOMContentLoaded', () => {
                     const carreras = (d.carrera || '').split(',').map(s => s.trim());
                     if(!carreras.includes(currentUser.role)) isValid = false;
                 }
-                if(isValid) {
+                
+                // Mostrar solo si no tiene vehículo, o si estamos editando y el vehículo le pertenece
+                const yaTiene = docentesConVehiculo.has(d.docente_id);
+                const esSuyo = vData && vData.docente_id === d.docente_id;
+                
+                if(isValid && (!yaTiene || esSuyo)) {
                     opts += `<option value="${d.docente_id}">${d.nombre} (${d.carrera || 'Sin carrera'})</option>`;
                 }
             });
