@@ -212,55 +212,140 @@ document.addEventListener('DOMContentLoaded', () => {
     // ==========================================
     // DATA FETCHING & REAL DATABASE CONNECTION
     // ==========================================
+    let _dirDocentes = []; // global for director drill-down
+
     async function loadDirectorDashboard() {
         try {
-            const [docRes, vehRes, presRes, evalRes] = await Promise.all([
+            const [docRes, vehRes, evalRes] = await Promise.all([
                 fetch('/api/docentes').catch(() => ({ok:false})),
                 fetch('/api/vehiculos').catch(() => ({ok:false})),
-                fetch('/api/presupuesto/totales').catch(() => ({ok:false})),
-                fetch('/api/evaluaciones/historico').catch(() => ({ok:false})) // Using an endpoint that might exist or just fail silently
+                fetch('/api/evaluaciones').catch(() => ({ok:false}))
             ]);
 
-            let docentes = docRes.ok ? await docRes.json() : [];
+            _dirDocentes = docRes.ok ? await docRes.json() : [];
             let vehiculos = vehRes.ok ? await vehRes.json() : [];
-            let presupuesto = presRes.ok ? await presRes.json() : [];
+            let evaluaciones = evalRes.ok ? await evalRes.json() : [];
 
-            document.getElementById('dir-stat-docentes').textContent = docentes.length;
+            document.getElementById('dir-stat-docentes').textContent = _dirDocentes.length;
             document.getElementById('dir-stat-vehiculos').textContent = vehiculos.length;
 
-            let totalPresupuesto = 0;
-            if (presupuesto.length > 0) {
-                totalPresupuesto = presupuesto.reduce((acc, p) => acc + (parseFloat(p.total_neto) || 0), 0);
-            }
-            document.getElementById('dir-stat-pso').textContent = '$' + totalPresupuesto.toLocaleString('es-MX', {minimumFractionDigits:2});
-
-            // Promedio evaluaciones mockup since we might not have a global stats endpoint
-            document.getElementById('dir-stat-evals').textContent = '92.4 / 100';
-
-            // Desglose por carreras
-            const counts = {};
-            docentes.forEach(d => {
-                const c = d.carrera ? d.carrera.split(',')[0].trim() : 'NA';
-                counts[c] = (counts[c] || 0) + 1;
+            // --- Desglose por carreras (clickable cards) ---
+            const carreraGroups = {};
+            _dirDocentes.forEach(d => {
+                const carreras = d.carrera ? d.carrera.split(',').map(s => s.trim()) : ['NA'];
+                carreras.forEach(c => {
+                    if (!carreraGroups[c]) carreraGroups[c] = [];
+                    carreraGroups[c].push(d);
+                });
             });
+
+            const CARRERA_COLORS = {
+                'ICI':'#b45309','ICE':'#0369a1','II':'#065f46','IC':'#9a3412','TC':'#374151',
+                'MED':'#be185d','ODO':'#0f766e','ENF':'#0c4a6e','NA':'#64748b'
+            };
             
-            const chartHtml = Object.entries(counts).map(([c, qty]) => {
-                const w = Math.max(10, Math.min(100, (qty / docentes.length) * 200));
+            const chartHtml = Object.entries(carreraGroups).map(([c, docs]) => {
+                const bg = CARRERA_COLORS[c] || '#475569';
                 return `
-                <div style="background:white;padding:12px;border-radius:10px;border:1px solid #e2e8f0;width:140px;text-align:center;box-shadow:0 2px 5px rgba(0,0,0,0.02);">
-                    <div style="font-weight:800;font-size:1.3rem;color:var(--color-maroon);">${c}</div>
-                    <div style="font-size:1.8rem;font-weight:900;color:#334155;margin:4px 0;">${qty}</div>
-                    <div style="height:4px;background:#e2e8f0;border-radius:4px;overflow:hidden;">
-                        <div style="width:${w}%;height:100%;background:var(--color-gold);"></div>
+                <div onclick="window.dirShowCarrera('${c}')" style="background:white;padding:16px;border-radius:12px;border:2px solid #e2e8f0;width:130px;text-align:center;cursor:pointer;transition:all 0.2s;box-shadow:0 2px 8px rgba(0,0,0,0.03);" onmouseover="this.style.borderColor='${bg}';this.style.transform='translateY(-3px)';this.style.boxShadow='0 6px 18px rgba(0,0,0,0.1)'" onmouseout="this.style.borderColor='#e2e8f0';this.style.transform='none';this.style.boxShadow='0 2px 8px rgba(0,0,0,0.03)'">
+                    <div style="font-weight:900;font-size:1.2rem;color:${bg};font-family:var(--font-display);">${c}</div>
+                    <div style="font-size:2rem;font-weight:900;color:#1e293b;margin:4px 0;">${docs.length}</div>
+                    <div style="height:3px;background:#f1f5f9;border-radius:3px;overflow:hidden;margin-top:6px;">
+                        <div style="width:100%;height:100%;background:${bg};"></div>
                     </div>
+                    <div style="font-size:0.68rem;color:#94a3b8;margin-top:6px;">Click para ver</div>
                 </div>`;
             }).join('');
             document.getElementById('dir-chart-carreras').innerHTML = chartHtml || '<span style="color:#94a3b8;">No hay datos</span>';
+
+            // --- Alertas de evaluación baja ---
+            // Buscar docentes con evaluaciones < 70 puntos
+            const alertasList = document.getElementById('dir-alertas-list');
+            let alertCount = 0;
+            let alertHtml = '';
+
+            if (evaluaciones.length > 0) {
+                // Agrupar evaluaciones por docente, buscar el puntaje más reciente
+                const evalByDocente = {};
+                evaluaciones.forEach(ev => {
+                    const did = ev.docente_id;
+                    if (!evalByDocente[did] || (ev.evaluacion_id > evalByDocente[did].evaluacion_id)) {
+                        evalByDocente[did] = ev;
+                    }
+                });
+
+                Object.values(evalByDocente).forEach(ev => {
+                    const puntaje = parseFloat(ev.puntaje_total) || 0;
+                    if (puntaje < 70 && puntaje > 0) {
+                        alertCount++;
+                        const docData = _dirDocentes.find(d => d.docente_id === ev.docente_id);
+                        const nombre = docData ? docData.nombre : `Docente #${ev.docente_id}`;
+                        const carrera = docData ? (docData.carrera || 'N/A') : 'N/A';
+                        const bgColor = puntaje < 50 ? '#fef2f2' : '#fffbeb';
+                        const borderColor = puntaje < 50 ? '#fecaca' : '#fef08a';
+                        const textColor = puntaje < 50 ? '#991b1b' : '#92400e';
+                        alertHtml += `
+                        <div style="background:${bgColor};border:1.5px solid ${borderColor};border-radius:12px;padding:14px 16px;display:flex;justify-content:space-between;align-items:center;">
+                            <div>
+                                <div style="font-weight:700;font-size:0.88rem;color:#1e293b;">${nombre}</div>
+                                <div style="font-size:0.75rem;color:#64748b;margin-top:2px;">${carrera} · Evaluado: ${ev.fecha_evaluacion || 'N/A'}</div>
+                            </div>
+                            <div style="display:flex;align-items:center;gap:10px;">
+                                <span style="background:${textColor};color:white;padding:4px 12px;border-radius:20px;font-size:0.85rem;font-weight:900;">${puntaje.toFixed(1)}</span>
+                                <button onclick="window.verPerfil(${ev.docente_id}, '${carrera}')" style="background:var(--color-maroon);color:white;border:none;padding:5px 12px;border-radius:6px;cursor:pointer;font-size:0.72rem;font-weight:700;">Ver perfil</button>
+                            </div>
+                        </div>`;
+                    }
+                });
+            }
+
+            document.getElementById('dir-stat-alertas').textContent = alertCount;
+            if (alertCount === 0) {
+                alertHtml = '<div style="background:#f0fdf4;border:1.5px solid #bbf7d0;border-radius:12px;padding:18px;text-align:center;color:#166534;font-weight:700;font-size:0.9rem;">✅ Todos los docentes evaluados tienen puntaje aceptable (≥ 70)</div>';
+            }
+            alertasList.innerHTML = alertHtml;
+
+            // Update KPI card color based on alerts
+            const kpiCard = document.getElementById('dir-eval-kpi-card');
+            if (alertCount > 0) {
+                kpiCard.style.background = 'linear-gradient(135deg, #991b1b, #ef4444)';
+            }
 
         } catch (e) {
             console.error('Error loadDirectorDashboard', e);
         }
     }
+
+    // Director: show docentes of a specific carrera inline
+    window.dirShowCarrera = function(carrera) {
+        const detail = document.getElementById('dir-carrera-detail');
+        detail.classList.remove('hidden');
+        document.getElementById('dir-carrera-detail-title').textContent = `Docentes de ${carrera}`;
+
+        const docs = _dirDocentes.filter(d => {
+            const carreras = (d.carrera || '').split(',').map(s => s.trim());
+            return carreras.includes(carrera) || (carrera === 'NA' && !d.carrera);
+        });
+
+        const listEl = document.getElementById('dir-carrera-detail-list');
+        if (docs.length === 0) {
+            listEl.innerHTML = '<span style="color:#94a3b8;">No hay docentes en esta carrera.</span>';
+            return;
+        }
+
+        listEl.innerHTML = docs.map(d => `
+            <div style="background:#f8fafc;border:1px solid #e2e8f0;border-radius:10px;padding:12px 14px;display:flex;justify-content:space-between;align-items:center;transition:all 0.15s;" onmouseover="this.style.borderColor='var(--color-maroon)';this.style.background='#fff5f7'" onmouseout="this.style.borderColor='#e2e8f0';this.style.background='#f8fafc'">
+                <div>
+                    <div style="font-weight:700;font-size:0.88rem;color:#1e293b;">${d.nombre}</div>
+                    <div style="font-size:0.72rem;color:#94a3b8;margin-top:2px;">${d.condicion || ''} · ${d.rfc || ''}</div>
+                </div>
+                <button onclick="window.verPerfil(${d.docente_id}, '${carrera}')" style="background:linear-gradient(135deg, #1d4ed8, #2563eb);color:white;border:none;padding:6px 14px;border-radius:7px;cursor:pointer;font-size:0.75rem;font-weight:700;white-space:nowrap;">Ver perfil</button>
+            </div>
+        `).join('');
+
+        detail.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+    };
+
 
     async function loadDocentesFromDatabase() {
         const tbody = document.getElementById('docentes-tbody');
@@ -1619,40 +1704,40 @@ document.addEventListener('DOMContentLoaded', () => {
         'MED':  '#be185d', 'ODO':  '#0f766e', 'ENF':  '#0c4a6e'
     };
 
+    // Store unconfigured school defaults globally so onclick can reference by index
+    let _pendingSchoolDefaults = [];
+
     async function loadAdminEscuelas() {
         const el = document.getElementById('admin-escuelas-lista');
         if (!el) return;
+        _pendingSchoolDefaults = [];
         el.innerHTML = '<span style="color:rgba(255,255,255,0.5);font-size:0.9rem;">Cargando...</span>';
         try {
             const res = await fetch('/api/escuelas');
             const data = await res.json();
-            if (!data.length) {
-                el.innerHTML = '<span style="color:rgba(255,255,255,0.5);">No hay planteles configurados aún. Use el formulario de abajo.</span>';
-                return;
-            }
+
             // Cargar detalles de cada plantel en paralelo
             el.innerHTML = '<span style="color:rgba(255,255,255,0.5);font-size:0.85rem;">Obteniendo detalles...</span>';
-            const detalles = await Promise.all(data.map(r =>
+            const detalles = data.length ? await Promise.all(data.map(r =>
                 fetch(`/api/escuelas/${r.datname}/detalle`).then(x => x.json()).catch(() => ({status:'error', database: r.datname}))
-            ));
+            )) : [];
 
-            el.innerHTML = '';
             // Definir planteles esperados por defecto en el sistema
             const defaultSchools = [
-                { siglas: 'EMI', db: 'gestion_docente_emi', nombre: 'Escuela Militar de Ingenieria', cycle: 'MAR-AGO 2026', carrerasCheck: ['ICI','ICE','II','IC','TC'] },
+                { siglas: 'EMI', db: 'gestion_docente_emi', nombre: 'Escuela Militar de Ingeniería', cycle: 'MAR-AGO 2026', carrerasCheck: ['ICI','ICE','II','IC','TC'] },
                 { siglas: 'EMM', db: 'gestion_docente_emm', nombre: 'Escuela Militar de Medicina', cycle: 'MAR-AGO 2026', carrerasCheck: ['MED'] },
-                { siglas: 'EMO', db: 'gestion_docente_emo', nombre: 'Escuela Militar de Odontologia', cycle: 'MAR-AGO 2026', carrerasCheck: ['ODO'] }
+                { siglas: 'EMO', db: 'gestion_docente_emo', nombre: 'Escuela Militar de Odontología', cycle: 'MAR-AGO 2026', carrerasCheck: ['ODO'] }
             ];
 
             const dbsExistentes = new Set(detalles.map(d => d.database));
-
-            // Agregar los no configurados al final
             defaultSchools.forEach(ds => {
                 if (!dbsExistentes.has(ds.db)) {
+                    const idx = _pendingSchoolDefaults.length;
+                    _pendingSchoolDefaults.push(ds);
                     detalles.push({
                         database: ds.db,
                         carreras: [], usuarios: [], totalDocentes: 0,
-                        isUnconfigured: true, defaultData: ds
+                        isUnconfigured: true, _defaultIdx: idx
                     });
                 }
             });
@@ -1660,9 +1745,9 @@ document.addEventListener('DOMContentLoaded', () => {
             el.innerHTML = '';
             detalles.forEach(d => {
                 const card = document.createElement('div');
-                card.style.cssText = 'background:rgba(255,255,255,0.08);border:1px solid rgba(255,255,255,0.18);border-radius:14px;padding:18px 20px;margin-bottom:14px;';
-
                 const isUnconf = d.isUnconfigured;
+                card.style.cssText = `background:${isUnconf ? 'rgba(220,38,38,0.08)' : 'rgba(255,255,255,0.08)'};border:1px solid ${isUnconf ? 'rgba(220,38,38,0.25)' : 'rgba(255,255,255,0.18)'};border-radius:14px;padding:18px 22px;flex:1 1 280px;min-width:280px;max-width:380px;`;
+
                 const siglas = d.database ? d.database.replace('gestion_docente_','').toUpperCase() : '?';
                 const carreras = d.carreras || [];
                 const usuarios = d.usuarios || [];
@@ -1679,35 +1764,33 @@ document.addEventListener('DOMContentLoaded', () => {
 
                 let btnHtml = '';
                 if (isUnconf) {
-                    const dDataStr = JSON.stringify(d.defaultData).replace(/"/g, '&quot;');
-                    btnHtml = `<button onclick="window.semPrellenarConfig('${dDataStr}')" style="background:#dc2626;color:white;border:none;padding:6px 14px;border-radius:8px;cursor:pointer;font-size:0.8rem;font-weight:800;">⚙️ Configurar Plantel</button>`;
+                    btnHtml = `<button onclick="window.semPrellenarConfig(${d._defaultIdx})" style="background:#dc2626;color:white;border:none;padding:6px 14px;border-radius:8px;cursor:pointer;font-size:0.8rem;font-weight:800;white-space:nowrap;">\u2699\uFE0F Configurar</button>`;
                 } else {
-                    btnHtml = `<button onclick="window.semAbrirGestionPlantel('${d.database}')" style="background:var(--color-gold);color:#1a0a00;border:none;padding:6px 14px;border-radius:8px;cursor:pointer;font-size:0.8rem;font-weight:800;">⚙️ Gestionar</button>`;
+                    btnHtml = `<button onclick="window.semAbrirGestionPlantel('${d.database}')" style="background:var(--color-gold);color:#1a0a00;border:none;padding:6px 14px;border-radius:8px;cursor:pointer;font-size:0.8rem;font-weight:800;white-space:nowrap;">\u2699\uFE0F Gestionar</button>`;
                 }
 
+                const statusBadge = isUnconf
+                    ? '<span style="background:rgba(220,38,38,0.2);color:#fca5a5;padding:2px 8px;border-radius:10px;font-size:0.65rem;font-weight:700;margin-left:6px;">NO CONFIGURADO</span>'
+                    : `<span style="background:rgba(34,197,94,0.15);color:#86efac;padding:2px 8px;border-radius:10px;font-size:0.65rem;font-weight:700;margin-left:6px;">ACTIVO</span>`;
+
                 card.innerHTML = `
-                    <div style="display:flex;justify-content:space-between;align-items:flex-start;margin-bottom:10px;">
+                    <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:12px;">
                         <div>
-                            <div style="display:flex;align-items:center;gap:10px;">
-                                <span style="font-size:1.4rem;">🏫</span>
-                                <div>
-                                    <div style="color:white;font-weight:800;font-size:1rem;">${siglas} ${isUnconf ? '<span style="color:#fca5a5;font-size:0.7rem;font-weight:normal;margin-left:5px;">NO CONFIGURADO</span>' : ''}</div>
-                                    <div style="color:rgba(255,255,255,0.5);font-size:0.78rem;">${d.database}</div>
-                                </div>
-                            </div>
+                            <div style="color:white;font-weight:900;font-size:1.15rem;font-family:var(--font-display);letter-spacing:0.5px;">${siglas}${statusBadge}</div>
+                            <div style="color:rgba(255,255,255,0.45);font-size:0.72rem;margin-top:2px;font-family:monospace;">${d.database}</div>
                         </div>
                         <div style="display:flex;gap:8px;align-items:center;">
-                            ${isUnconf ? '' : `<span style="background:rgba(255,255,255,0.1);color:rgba(255,255,255,0.8);padding:4px 12px;border-radius:20px;font-size:0.78rem;font-weight:700;">👨‍🏫 ${docentes} docentes</span>`}
+                            ${isUnconf ? '' : `<span style="background:rgba(255,255,255,0.1);color:rgba(255,255,255,0.8);padding:4px 10px;border-radius:20px;font-size:0.72rem;font-weight:700;">${docentes} doc.</span>`}
                             ${btnHtml}
                         </div>
                     </div>
-                    <div style="margin-bottom:8px;">
-                        <div style="color:rgba(255,255,255,0.6);font-size:0.72rem;text-transform:uppercase;letter-spacing:0.5px;margin-bottom:5px;">Carreras (${carreras.length})</div>
-                        <div>${carrerasBadges || '<em style="color:rgba(255,255,255,0.3);font-size:0.8rem;">Sin carreras configuradas</em>'}</div>
+                    <div style="margin-bottom:6px;">
+                        <div style="color:rgba(255,255,255,0.5);font-size:0.68rem;text-transform:uppercase;letter-spacing:0.5px;margin-bottom:4px;">Carreras (${carreras.length})</div>
+                        <div>${carrerasBadges || '<em style="color:rgba(255,255,255,0.25);font-size:0.75rem;">Sin carreras</em>'}</div>
                     </div>
                     <div>
-                        <div style="color:rgba(255,255,255,0.6);font-size:0.72rem;text-transform:uppercase;letter-spacing:0.5px;margin-bottom:5px;">Usuarios (${usuarios.length})</div>
-                        <div>${usersBadges || '<em style="color:rgba(255,255,255,0.3);font-size:0.8rem;">Sin usuarios</em>'}</div>
+                        <div style="color:rgba(255,255,255,0.5);font-size:0.68rem;text-transform:uppercase;letter-spacing:0.5px;margin-bottom:4px;">Usuarios (${usuarios.length})</div>
+                        <div>${usersBadges || '<em style="color:rgba(255,255,255,0.25);font-size:0.75rem;">Sin usuarios</em>'}</div>
                     </div>
                 `;
                 el.appendChild(card);
@@ -1717,8 +1800,9 @@ document.addEventListener('DOMContentLoaded', () => {
         }
     }
 
-    window.semPrellenarConfig = function(dataStr) {
-        const ds = JSON.parse(dataStr);
+    window.semPrellenarConfig = function(idx) {
+        const ds = _pendingSchoolDefaults[idx];
+        if (!ds) { alert('Error: datos de plantel no encontrados.'); return; }
         document.getElementById('np-siglas').value = ds.siglas;
         document.getElementById('np-ciclo').value = ds.cycle;
         document.getElementById('np-nombre').value = ds.nombre;
