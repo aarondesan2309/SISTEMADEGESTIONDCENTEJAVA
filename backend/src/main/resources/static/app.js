@@ -1144,7 +1144,7 @@ document.addEventListener('DOMContentLoaded', () => {
             let tarifaTec = 199.30;
             let tarifaDoc = 1048.95;
 
-            let htmlTabla = `<table style="width:100%; border-collapse:collapse; margin-bottom:10px; font-size:0.85rem;">
+            let htmlTabla = `<div style="overflow-x:auto;"><table style="min-width:750px;width:100%; border-collapse:collapse; margin-bottom:10px; font-size:0.85rem;">
                 <thead>
                 <tr style="background:#1e3a5f;color:white;">
                     <th style="padding:8px 10px;text-align:left;">Unidad de Aprendizaje</th>
@@ -1186,8 +1186,8 @@ document.addEventListener('DOMContentLoaded', () => {
                     const puedeGenerar = currentUser.role === 'ADM' || m.carrera === currentUser.role;
                     const matEsc = m.materia.replace(/'/g, "\\'");
                     const nomEsc = nombre.replace(/'/g, "\\'");
-                    const btnHtml = puedeGenerar 
-                        ? `<button onclick="window.confirmarGeneracionIndividual(${docenteId}, ${m.materia_id}, '${matEsc}', '${nomEsc}')" 
+                    const btnHtml = puedeGenerar
+                        ? `<button onclick="window.confirmarGeneracionIndividual(event, ${docenteId}, ${m.materia_id}, '${matEsc}', '${nomEsc}')" 
                                    style="padding:5px 10px; background:var(--color-maroon); color:white; border:none; border-radius:4px; cursor:pointer; font-size:0.75rem;">
                                    🖨️ Generar
                            </button>`
@@ -1222,7 +1222,7 @@ document.addEventListener('DOMContentLoaded', () => {
                     </tr>`;
                 });
             }
-            htmlTabla += `</tbody></table>`;
+            htmlTabla += `</tbody></table></div>`;
 
             const addMateriaHtml = `
             <div style="background:#f0fdf4; border:1px dashed #22c55e; padding:10px; border-radius:8px; margin-bottom:20px; font-size:0.85rem; display:flex; gap:10px; align-items:center;">
@@ -1382,13 +1382,29 @@ document.addEventListener('DOMContentLoaded', () => {
         }
     };
 
-    window.confirmarGeneracionIndividual = async function(docenteId, materiaId, materiaNombre, docenteNombre) {
+    window.confirmarGeneracionIndividual = async function(evtOrDocId, docenteIdOrMateriaId, materiaIdOrMatNombre, materiaNombreOrDocNombre, docenteNombreOpt) {
+        // Soporta dos firmas: (event, docId, matId, matNombre, docNombre) o (docId, matId, matNombre, docNombre)
+        let btn, docenteId, materiaId, materiaNombre, docenteNombre;
+        if (evtOrDocId instanceof Event || (evtOrDocId && evtOrDocId.target)) {
+            const ev = evtOrDocId;
+            btn = ev.target.closest('button') || ev.target;
+            docenteId = docenteIdOrMateriaId;
+            materiaId = materiaIdOrMatNombre;
+            materiaNombre = materiaNombreOrDocNombre;
+            docenteNombre = docenteNombreOpt || '';
+        } else {
+            // Firma legacy: (docId, matId, matNombre, docNombre)
+            btn = (typeof event !== 'undefined' && event && event.target) ? (event.target.closest('button') || event.target) : null;
+            docenteId = evtOrDocId;
+            materiaId = docenteIdOrMateriaId;
+            materiaNombre = materiaIdOrMatNombre;
+            docenteNombre = materiaNombreOrDocNombre || '';
+        }
+
         if (!confirm(`¿Deseas generar el contrato para la materia "${materiaNombre}"?`)) return;
         
-        const btn = event.target;
-        const ogText = btn.innerHTML;
-        btn.innerHTML = '⏳...';
-        btn.disabled = true;
+        const ogText = btn ? btn.innerHTML : '';
+        if (btn) { btn.innerHTML = '⏳...'; btn.disabled = true; }
 
         try {
             const payload = {
