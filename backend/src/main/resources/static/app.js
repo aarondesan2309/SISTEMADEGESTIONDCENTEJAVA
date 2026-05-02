@@ -1878,4 +1878,146 @@ document.addEventListener('DOMContentLoaded', () => {
         }
     };
 
+    // ==========================================
+    // CONTROL VEHICULAR
+    // ==========================================
+    window.loadVehiculosFromDatabase = async function() {
+        const tbody = document.getElementById('vehiculos-tbody');
+        if(!tbody) return;
+
+        try {
+            tbody.innerHTML = "<tr><td colspan='7'>Cargando vehículos...</td></tr>";
+            
+            // Pasamos el rol actual para filtrar en el backend si es Jefe de Carrera
+            const role = currentUser.role || '';
+            const res = await fetch(`/api/vehiculos?role=${role}`);
+            if (!res.ok) throw new Error("Error en servidor");
+            const vehiculos = await res.json();
+            
+            tbody.innerHTML = "";
+            let vehiculosHtml = '';
+            
+            if (vehiculos.length === 0) {
+                vehiculosHtml = "<tr><td colspan='7' style='text-align:center;'>No hay vehículos registrados para esta carrera.</td></tr>";
+            } else {
+                vehiculos.forEach(v => {
+                    vehiculosHtml += `
+                    <tr>
+                        <td><strong>${v.carrera || 'N/A'}</strong></td>
+                        <td>${v.docente}</td>
+                        <td>${v.marca} ${v.modelo || ''}</td>
+                        <td>${v.anio || ''}</td>
+                        <td>${v.color || ''}</td>
+                        <td style="font-family:monospace;font-weight:bold;background:#f8fafc;padding:4px 8px;border:1px solid #e2e8f0;border-radius:4px;">${v.placas}</td>
+                        <td>
+                            <button onclick='window.openVehiculoModal(${JSON.stringify(v)})' style="background:#0369a1;color:white;border:none;padding:5px 10px;border-radius:6px;cursor:pointer;font-size:0.75rem;">Editar</button>
+                            <button onclick="window.eliminarVehiculo(${v.vehiculo_id})" style="background:#dc2626;color:white;border:none;padding:5px 10px;border-radius:6px;cursor:pointer;font-size:0.75rem;">Eliminar</button>
+                        </td>
+                    </tr>`;
+                });
+            }
+            tbody.innerHTML = vehiculosHtml;
+            document.getElementById('vehiculos-stats').innerHTML = `<span style="background:#f0fdf4;color:#166534;border:1px solid #bbf7d0;padding:6px 16px;border-radius:20px;font-weight:700;">Total: ${vehiculos.length} vehículos</span>`;
+        } catch(e) {
+            tbody.innerHTML = `<tr><td colspan="7" style="color:red;">Error: ${e.message}</td></tr>`;
+        }
+    };
+
+    window.openVehiculoModal = async function(vData = null) {
+        document.getElementById('modal-vehiculo').classList.remove('hidden');
+        document.getElementById('modal-vehiculo-title').textContent = vData ? 'Editar Vehículo' : 'Registrar Vehículo';
+        
+        // Cargar docentes
+        const selectDocente = document.getElementById('v-docente');
+        try {
+            const res = await fetch('/api/docentes');
+            const docentes = await res.json();
+            let opts = '<option value="">-- Seleccione un docente --</option>';
+            
+            // Filtro por rol del jefe de carrera
+            docentes.forEach(d => {
+                let isValid = true;
+                if(currentUser.role !== 'ADM' && currentUser.role !== 'DIR' && currentUser.role !== 'SEM' && currentUser.role !== 'JSA') {
+                    const carreras = (d.carrera || '').split(',').map(s => s.trim());
+                    if(!carreras.includes(currentUser.role)) isValid = false;
+                }
+                if(isValid) {
+                    opts += `<option value="${d.docente_id}">${d.nombre} (${d.carrera || 'Sin carrera'})</option>`;
+                }
+            });
+            selectDocente.innerHTML = opts;
+        } catch(e) {
+            selectDocente.innerHTML = '<option value="">Error cargando docentes</option>';
+        }
+
+        // Rellenar datos si es edición
+        if (vData) {
+            document.getElementById('vehiculo-id').value = vData.vehiculo_id;
+            setTimeout(() => document.getElementById('v-docente').value = vData.docente_id, 100); // Dar tiempo a que el select se llene
+            document.getElementById('v-marca').value = vData.marca || '';
+            document.getElementById('v-modelo').value = vData.modelo || '';
+            document.getElementById('v-anio').value = vData.anio || '';
+            document.getElementById('v-color').value = vData.color || '';
+            document.getElementById('v-placas').value = vData.placas || '';
+        } else {
+            document.getElementById('form-vehiculo').reset();
+            document.getElementById('vehiculo-id').value = '';
+        }
+    };
+
+    window.closeVehiculoModal = function() {
+        document.getElementById('modal-vehiculo').classList.add('hidden');
+    };
+
+    window.guardarVehiculo = async function() {
+        const id = document.getElementById('vehiculo-id').value;
+        const payload = {
+            docente_id: document.getElementById('v-docente').value,
+            marca: document.getElementById('v-marca').value,
+            modelo: document.getElementById('v-modelo').value,
+            anio: document.getElementById('v-anio').value,
+            color: document.getElementById('v-color').value,
+            placas: document.getElementById('v-placas').value
+        };
+
+        if(!payload.docente_id || !payload.marca || !payload.placas) {
+            alert('Docente, Marca y Placas son obligatorios');
+            return;
+        }
+
+        try {
+            const url = id ? `/api/vehiculos/${id}` : '/api/vehiculos';
+            const method = id ? 'PUT' : 'POST';
+            const res = await fetch(url, {
+                method: method,
+                headers: {'Content-Type': 'application/json'},
+                body: JSON.stringify(payload)
+            });
+            
+            const data = await res.json();
+            if(data.status === 'ok') {
+                closeVehiculoModal();
+                loadVehiculosFromDatabase();
+            } else {
+                alert('Error: ' + data.message);
+            }
+        } catch(e) {
+            alert('Error de conexión');
+        }
+    };
+
+    window.eliminarVehiculo = async function(id) {
+        if(!confirm('¿Estás seguro de eliminar este vehículo?')) return;
+        try {
+            const res = await fetch(`/api/vehiculos/${id}`, { method: 'DELETE' });
+            if(res.ok) {
+                loadVehiculosFromDatabase();
+            } else {
+                alert('Error eliminando vehículo');
+            }
+        } catch(e) {
+            alert('Error de conexión');
+        }
+    };
+
 });

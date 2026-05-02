@@ -21,7 +21,7 @@ public class VehiculoController {
     // GET /api/vehiculos
     // =============================================
     @GetMapping("/vehiculos")
-    public ResponseEntity<List<Map<String, Object>>> getVehiculos() {
+    public ResponseEntity<List<Map<String, Object>>> getVehiculos(@RequestParam(required = false) String role) {
         String sql = """
             SELECT v.vehiculo_id,
                    d.docente_id,
@@ -38,8 +38,13 @@ public class VehiculoController {
                    v.placas
             FROM Vehiculo v
             JOIN Docente d ON v.docente_id = d.docente_id
-            ORDER BY v.vehiculo_id DESC
             """;
+
+        if (role != null && !role.equalsIgnoreCase("ADM") && !role.equalsIgnoreCase("DIR") && !role.equalsIgnoreCase("SEM") && !role.equalsIgnoreCase("JSA")) {
+            sql += " WHERE EXISTS (SELECT 1 FROM Asignacion a JOIN Materia m ON a.materia_id = m.materia_id JOIN Carrera c ON m.carrera_id = c.carrera_id WHERE a.docente_id = d.docente_id AND c.siglas = '" + role.replace("'", "''") + "') ";
+        }
+
+        sql += " ORDER BY v.vehiculo_id DESC";
         return ResponseEntity.ok(jdbcTemplate.queryForList(sql));
     }
 

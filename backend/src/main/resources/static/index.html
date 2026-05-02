@@ -327,6 +327,90 @@
                 </div>
             </div>
 
+            <!-- View: Vehiculos -->
+            <div id="view-vehiculos" class="view-section hidden">
+                <button class="btn-back" onclick="appNavigate('dashboard')">&#8592; Volver al Menu</button>
+                <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:16px;">
+                    <h2 style="color:var(--color-maroon); text-transform:uppercase;">Control Vehicular</h2>
+                    <button class="btn-action" id="btn-add-vehiculo" onclick="openVehiculoModal()">+ REGISTRAR VEHICULO</button>
+                </div>
+                <!-- Contadores -->
+                <div id="vehiculos-stats" style="margin-bottom:20px; display:flex; gap:8px; flex-wrap:wrap;">
+                    <span style="background:#e2e8f0;color:#444;padding:6px 16px;border-radius:20px;font-weight:600;">Cargando...</span>
+                </div>
+                <!-- Tabla -->
+                <div class="glass-card">
+                    <div class="table-container">
+                        <table class="data-table">
+                            <thead>
+                                <tr>
+                                    <th>CARRERA(S)</th>
+                                    <th>DOCENTE</th>
+                                    <th>MARCA Y MODELO</th>
+                                    <th>AÑO</th>
+                                    <th>COLOR</th>
+                                    <th>PLACAS</th>
+                                    <th>ACCIONES</th>
+                                </tr>
+                            </thead>
+                            <tbody id="vehiculos-tbody">
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+
+                <!-- Modal Vehiculo -->
+                <div id="modal-vehiculo" class="hidden" style="position:fixed;top:0;left:0;right:0;bottom:0;background:rgba(10,15,30,0.75);z-index:1001;display:flex;justify-content:center;align-items:flex-start;overflow-y:auto;padding:30px 20px;backdrop-filter:blur(4px);">
+                    <div style="background:white;width:100%;max-width:600px;border-radius:24px;overflow:hidden;box-shadow:0 30px 80px rgba(0,0,0,0.3);margin:auto;">
+                        <div style="background:linear-gradient(135deg,#3a0d18,#631b2f);padding:20px 24px;display:flex;align-items:center;justify-content:space-between;">
+                            <h3 id="modal-vehiculo-title" style="color:white;font-size:1.1rem;margin:0;font-weight:800;text-transform:uppercase;">Registrar Vehículo</h3>
+                            <button onclick="closeVehiculoModal()" style="background:rgba(255,255,255,0.1);border:1px solid rgba(255,255,255,0.3);color:white;border-radius:50%;width:30px;height:30px;cursor:pointer;font-size:1rem;">&times;</button>
+                        </div>
+                        <div style="padding:24px;">
+                            <form id="form-vehiculo" onsubmit="event.preventDefault(); guardarVehiculo();">
+                                <input type="hidden" id="vehiculo-id">
+                                <div style="display:grid;grid-template-columns:1fr;gap:16px;">
+                                    <div>
+                                        <label class="lbl-field">DOCENTE PROPIETARIO <span style="color:#c0392b;">*</span></label>
+                                        <select id="v-docente" required style="width:100%;padding:10px 13px;border:1.5px solid #e2e8f0;border-radius:9px;font-size:0.95rem;">
+                                            <option value="">Cargando docentes...</option>
+                                        </select>
+                                    </div>
+                                    <div style="display:grid;grid-template-columns:1fr 1fr;gap:16px;">
+                                        <div>
+                                            <label class="lbl-field">MARCA <span style="color:#c0392b;">*</span></label>
+                                            <input type="text" id="v-marca" required placeholder="Ej: Toyota" style="width:100%;padding:10px 13px;border:1.5px solid #e2e8f0;border-radius:9px;font-size:0.95rem;box-sizing:border-box;">
+                                        </div>
+                                        <div>
+                                            <label class="lbl-field">MODELO</label>
+                                            <input type="text" id="v-modelo" placeholder="Ej: Corolla" style="width:100%;padding:10px 13px;border:1.5px solid #e2e8f0;border-radius:9px;font-size:0.95rem;box-sizing:border-box;">
+                                        </div>
+                                    </div>
+                                    <div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:16px;">
+                                        <div>
+                                            <label class="lbl-field">AÑO</label>
+                                            <input type="number" id="v-anio" placeholder="2020" min="1950" max="2100" style="width:100%;padding:10px 13px;border:1.5px solid #e2e8f0;border-radius:9px;font-size:0.95rem;box-sizing:border-box;">
+                                        </div>
+                                        <div>
+                                            <label class="lbl-field">COLOR</label>
+                                            <input type="text" id="v-color" placeholder="Ej: Rojo" style="width:100%;padding:10px 13px;border:1.5px solid #e2e8f0;border-radius:9px;font-size:0.95rem;box-sizing:border-box;">
+                                        </div>
+                                        <div>
+                                            <label class="lbl-field">PLACAS <span style="color:#c0392b;">*</span></label>
+                                            <input type="text" id="v-placas" required placeholder="ABC-123" oninput="this.value=this.value.toUpperCase()" style="width:100%;padding:10px 13px;border:1.5px solid #e2e8f0;border-radius:9px;font-size:0.95rem;box-sizing:border-box;">
+                                        </div>
+                                    </div>
+                                </div>
+                                <div style="margin-top:24px;display:flex;gap:12px;">
+                                    <button type="submit" class="btn-action" style="flex:2;">&#10003; Guardar</button>
+                                    <button type="button" onclick="closeVehiculoModal()" style="flex:1;background:transparent;color:#64748b;border:1.5px solid #e2e8f0;padding:14px;border-radius:12px;cursor:pointer;font-weight:700;">Cancelar</button>
+                                </div>
+                            </form>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
             <!-- MODAL: VER / EDITAR PERFIL -->
             <div id="modal-perfil" class="hidden" style="position:fixed;top:0;left:0;right:0;bottom:0;background:rgba(10,15,30,0.75);z-index:1001;display:flex;justify-content:center;align-items:flex-start;overflow-y:auto;padding:30px 20px;backdrop-filter:blur(4px);">
                 <div style="background:white;width:100%;max-width:780px;border-radius:24px;overflow:hidden;box-shadow:0 30px 80px rgba(0,0,0,0.3);margin:auto;position:relative;">
