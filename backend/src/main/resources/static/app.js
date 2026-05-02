@@ -1,5 +1,25 @@
 // app.js
 
+// Interceptor: añade context path y JWT token a las llamadas /api/*
+(function() {
+    const m = window.location.pathname.match(/^\/([^\/]+)/);
+    const seg = m ? m[1] : '';
+    const ctx = (seg && !seg.startsWith('api') && !seg.includes('.')) ? '/' + seg : '';
+    const _fetch = window.fetch;
+    window.fetch = function(url, init) {
+        init = init || {};
+        if (typeof url === 'string' && url.startsWith('/api/')) {
+            if (ctx) url = ctx + url;
+            const token = sessionStorage.getItem('sgdc_jwt');
+            if (token && url.indexOf('/api/login') === -1) {
+                init.headers = Object.assign({}, init.headers || {}, { 'Authorization': 'Bearer ' + token });
+            }
+        }
+        return _fetch.call(this, url, init);
+    };
+    console.log('[fetch-interceptor] context=' + ctx + ' (JWT auto-attach activo)');
+})();
+
 document.addEventListener('DOMContentLoaded', () => {
     // UI Containers
     const landingWrapper = document.getElementById('landing-container');
@@ -18,12 +38,75 @@ document.addEventListener('DOMContentLoaded', () => {
         document.getElementById('login-school-title').textContent = "( " + schoolCode + " )";
         landingWrapper.classList.add('auth-hidden');
         loginWrapper.classList.remove('auth-hidden');
+        loadQuickRoles();
     };
 
     window.backToLanding = function() {
         loginWrapper.classList.add('auth-hidden');
         landingWrapper.classList.remove('auth-hidden');
     };
+
+    // --- Admin SEM ---
+    window.openAdminSem = function() {
+        landingWrapper.classList.add('auth-hidden');
+        document.getElementById('admin-sem-container').classList.remove('auth-hidden');
+        loadSemQuickUsers();
+    };
+
+    window.backFromAdminSem = function() {
+        sessionStorage.removeItem('sgdc_jwt');
+        document.getElementById('admin-sem-container').classList.add('auth-hidden');
+        landingWrapper.classList.remove('auth-hidden');
+        // reset panel state
+        document.getElementById('admin-sem-login-card').classList.remove('auth-hidden');
+        document.getElementById('admin-sem-panel').classList.add('auth-hidden');
+        document.getElementById('admin-sem-user').value = '';
+        document.getElementById('admin-sem-pass').value = '';
+        document.getElementById('admin-sem-error').style.display = 'none';
+    };
+
+    window.logoutAdminSem = function() {
+        window.backFromAdminSem();
+    };
+
+    document.getElementById('admin-sem-form').addEventListener('submit', async (e) => {
+        e.preventDefault();
+        const username = document.getElementById('admin-sem-user').value.trim();
+        const pass = document.getElementById('admin-sem-pass').value.trim();
+        const errEl = document.getElementById('admin-sem-error');
+        const btn = e.target.querySelector('button');
+        btn.textContent = 'Verificando...';
+        btn.disabled = true;
+        errEl.style.display = 'none';
+
+        try {
+            const res = await fetch('/api/login', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ username, password: pass })
+            });
+            const data = await res.json();
+            if (res.ok && data.status === 'ok' && data.role === 'SEM') {
+                if (data.token) sessionStorage.setItem('sgdc_jwt', data.token);
+                document.getElementById('admin-sem-login-card').classList.add('auth-hidden');
+                document.getElementById('admin-sem-panel').classList.remove('auth-hidden');
+                document.getElementById('admin-sem-logged-user').textContent = username + ' · SEM';
+                loadAdminEscuelas();
+            } else if (res.ok && data.status === 'ok') {
+                errEl.textContent = 'Acceso denegado. Se requiere rol SEM.';
+                errEl.style.display = 'block';
+            } else {
+                errEl.textContent = 'Credenciales inválidas.';
+                errEl.style.display = 'block';
+            }
+        } catch (err) {
+            errEl.textContent = 'Error conectando al servidor.';
+            errEl.style.display = 'block';
+        } finally {
+            btn.textContent = 'INGRESAR';
+            btn.disabled = false;
+        }
+    });
 
     // Handle Login
     loginForm.addEventListener('submit', async (e) => {
@@ -44,6 +127,7 @@ document.addEventListener('DOMContentLoaded', () => {
             });
             const data = await res.json();
             if (res.ok && data.status === 'ok') {
+                if (data.token) sessionStorage.setItem('sgdc_jwt', data.token);
                 currentUser = { name: username, role: data.role };
                 initApp();
             } else {
@@ -59,6 +143,7 @@ document.addEventListener('DOMContentLoaded', () => {
 
     // Handle Logout
     btnLogout.addEventListener('click', () => {
+        sessionStorage.removeItem('sgdc_jwt');
         currentUser = null;
         appWrapper.classList.add('auth-hidden');
         landingWrapper.classList.remove('auth-hidden');
@@ -1054,86 +1139,103 @@ document.addEventListener('DOMContentLoaded', () => {
             const matRes = await fetch(`/api/materias/${docenteId}`);
             let materias = matRes.ok ? await matRes.json() : [];
             
-            let tarifaLic = 486.71;
-            let tarifaMtr = 851.75;
-            let tarifaTec = 231.19;
+            let tarifaLic = 419.58;
+            let tarifaMtr = 734.27;
+            let tarifaTec = 199.30;
+            let tarifaDoc = 1048.95;
 
-            let htmlTabla = `<table style="width:100%; border-collapse:collapse; margin-bottom:10px;">
-                <tr style="background:#f1f5f9;border-bottom:2px solid #cbd5e1;">
-                    <th style="padding:10px;text-align:left;">Unidad de Aprendizaje</th>
-                    <th style="padding:10px;text-align:center;">Tabulador</th>
-                    <th style="padding:10px;text-align:center;">Horas</th>
-                    <th style="padding:10px;text-align:right;">Subtotal Men.</th>
-                    <th style="padding:10px;text-align:center;">Acción</th>
-                </tr>`;
+            let htmlTabla = `<table style="width:100%; border-collapse:collapse; margin-bottom:10px; font-size:0.85rem;">
+                <thead>
+                <tr style="background:#1e3a5f;color:white;">
+                    <th style="padding:8px 10px;text-align:left;">Unidad de Aprendizaje</th>
+                    <th style="padding:8px;text-align:center;">Tabulador</th>
+                    <th style="padding:8px;text-align:center;" title="Horas mensuales Mes 1 (Marzo)">M1<br><small style='font-weight:normal;opacity:.8'>Marzo</small></th>
+                    <th style="padding:8px;text-align:center;" title="Horas mensuales Mes 2 (Abril)">M2<br><small style='font-weight:normal;opacity:.8'>Abril</small></th>
+                    <th style="padding:8px;text-align:center;" title="Horas mensuales Mes 3 (Mayo)">M3<br><small style='font-weight:normal;opacity:.8'>Mayo</small></th>
+                    <th style="padding:8px;text-align:center;" title="Horas mensuales Mes 4 (Junio)">M4<br><small style='font-weight:normal;opacity:.8'>Junio</small></th>
+                    <th style="padding:8px;text-align:right;">Total<br><small style='font-weight:normal;opacity:.8'>hrs/sem</small></th>
+                    <th style="padding:8px;text-align:right;">Pago M1</th>
+                    <th style="padding:8px;text-align:center;">Acción</th>
+                </tr>
+                </thead><tbody>`;
             
-            let totalMensual = 0;
             let totalHorasDocente = 0;
             if (materias.length === 0) {
-                htmlTabla += `<tr><td colspan="5" style="padding:10px;text-align:center;">Sin materias asignadas</td></tr>`;
+                htmlTabla += `<tr><td colspan="9" style="padding:10px;text-align:center;">Sin materias asignadas</td></tr>`;
             } else {
                 materias.forEach((m, idx) => {
-                    const horas = m.horas || 0;
-                    totalHorasDocente += horas;
+                    const hm1 = parseFloat(m.horas_m1) || 0;
+                    const hm2 = parseFloat(m.horas_m2) || 0;
+                    const hm3 = parseFloat(m.horas_m3) || 0;
+                    const hm4 = parseFloat(m.horas_m4) || 0;
+                    const horasTotal = parseFloat(m.horas) || 0;
+                    const allZero = (hm1 + hm2 + hm3 + hm4) === 0;
+                    const m1 = allZero ? horasTotal : hm1;
+                    const m2 = allZero ? horasTotal : hm2;
+                    const m3 = allZero ? horasTotal : hm3;
+                    const m4 = allZero ? horasTotal : hm4;
+                    totalHorasDocente += m1;
                     const nivel = m.nivel_pago || 'Licenciatura';
                     let tarifaLocal = tarifaLic;
-                    if (nivel === 'Maestría') tarifaLocal = tarifaMtr;
-                    if (nivel === 'Técnico') tarifaLocal = tarifaTec;
+                    if (nivel === 'Maestría' || nivel === 'Maestria') tarifaLocal = tarifaMtr;
+                    else if (nivel === 'Técnico' || nivel === 'Tecnico') tarifaLocal = tarifaTec;
+                    else if (nivel === 'Doctorado') tarifaLocal = tarifaDoc;
 
-                    const subtotal = horas * tarifaLocal;
-                    totalMensual += subtotal;
+                    const pagoM1 = m1 * tarifaLocal;
                     
-                    // VALIDACION DE CARRERA: Solo puede generar de su propia carrera
                     const puedeGenerar = currentUser.role === 'ADM' || m.carrera === currentUser.role;
+                    const matEsc = m.materia.replace(/'/g, "\\'");
+                    const nomEsc = nombre.replace(/'/g, "\\'");
                     const btnHtml = puedeGenerar 
-                        ? `<button onclick="window.confirmarGeneracionIndividual(${docenteId}, ${m.materia_id}, '${m.materia.replace(/'/g, "\\'")}', '${nombre.replace(/'/g, "\\'")}')" 
+                        ? `<button onclick="window.confirmarGeneracionIndividual(${docenteId}, ${m.materia_id}, '${matEsc}', '${nomEsc}')" 
                                    style="padding:5px 10px; background:var(--color-maroon); color:white; border:none; border-radius:4px; cursor:pointer; font-size:0.75rem;">
                                    🖨️ Generar
                            </button>`
                         : `<span style="font-size:0.7rem; color:#94a3b8; font-style:italic;">No autorizado (${m.carrera})</span>`;
 
-                    htmlTabla += `<tr style="border-bottom:1px solid #e2e8f0;">
-                        <td style="padding:10px; font-weight:600;">${m.materia} <span style="font-size:0.75rem;color:#64748b;font-weight:normal;display:block;">${m.carrera}</span></td>
-                        <td style="padding:10px;text-align:center;">
-                            <select style="padding:4px; border:1px solid #ccc; border-radius:4px; font-size:0.85rem;" onchange="window.recalcPreviewLevel(this, ${docenteId}, '${m.materia}', ${horas})">
-                                <option value="Técnico" ${nivel === 'Técnico' ? 'selected' : ''}>Técnico</option>
+                    const inputStyle = 'width:52px;text-align:center;padding:3px;border:1.5px solid #cbd5e1;border-radius:4px;font-size:0.82rem;';
+                    htmlTabla += `<tr style="border-bottom:1px solid #e2e8f0;${m.ya_emitido ? 'background:#f0fdf4;' : ''}">
+                        <td style="padding:8px 10px; font-weight:600;">
+                            ${m.ya_emitido ? '<span style="color:#0f766e;font-size:0.7rem;font-weight:700;">✅ EMITIDO</span><br>' : ''}
+                            ${m.materia} <span style="font-size:0.72rem;color:#64748b;font-weight:normal;display:block;">${m.carrera}</span>
+                        </td>
+                        <td style="padding:8px;text-align:center;">
+                            <select style="padding:3px;border:1px solid #ccc;border-radius:4px;font-size:0.8rem;" onchange="window.recalcPreviewLevel(this, ${docenteId}, '${matEsc}', ${m1}, ${m2}, ${m3}, ${m4})">
+                                <option value="Técnico" ${(nivel === 'Técnico'||nivel === 'Tecnico') ? 'selected' : ''}>Técnico</option>
                                 <option value="Licenciatura" ${nivel === 'Licenciatura' ? 'selected' : ''}>Licenciatura</option>
-                                <option value="Maestría" ${nivel === 'Maestría' ? 'selected' : ''}>Maestría</option>
+                                <option value="Maestría" ${(nivel === 'Maestría'||nivel === 'Maestria') ? 'selected' : ''}>Maestría</option>
+                                <option value="Doctorado" ${nivel === 'Doctorado' ? 'selected' : ''}>Doctorado</option>
                             </select>
                         </td>
-                        <td style="padding:10px;text-align:center;">
-                            <input type="number" min="0" value="${horas}" style="width:60px; text-align:center; padding:4px; border:1px solid #ccc; border-radius:4px;" onchange="window.recalcPreview(this, ${docenteId}, '${m.materia}', '${nivel}')" /> hrs
-                        </td>
-                        <td style="padding:10px;text-align:right; font-family:monospace; font-size:0.95rem;">$${subtotal.toLocaleString('es-MX', {minimumFractionDigits:2})}</td>
-                        <td style="padding:10px;text-align:center;">
+                        <td style="padding:6px 4px;text-align:center;"><input type="number" min="0" max="999" value="${m1}" style="${inputStyle}" data-docid="${docenteId}" data-mat="${matEsc}" data-mes="1" data-nivel="${nivel}" onchange="window.recalcPreviewMes(this)" /> </td>
+                        <td style="padding:6px 4px;text-align:center;"><input type="number" min="0" max="999" value="${m2}" style="${inputStyle}" data-docid="${docenteId}" data-mat="${matEsc}" data-mes="2" data-nivel="${nivel}" onchange="window.recalcPreviewMes(this)" /> </td>
+                        <td style="padding:6px 4px;text-align:center;"><input type="number" min="0" max="999" value="${m3}" style="${inputStyle}" data-docid="${docenteId}" data-mat="${matEsc}" data-mes="3" data-nivel="${nivel}" onchange="window.recalcPreviewMes(this)" /> </td>
+                        <td style="padding:6px 4px;text-align:center;"><input type="number" min="0" max="999" value="${m4}" style="${inputStyle}" data-docid="${docenteId}" data-mat="${matEsc}" data-mes="4" data-nivel="${nivel}" onchange="window.recalcPreviewMes(this)" /> </td>
+                        <td style="padding:8px;text-align:right;font-weight:700;">${m1+m2+m3+m4} hrs</td>
+                        <td style="padding:8px;text-align:right;font-family:monospace;">$${pagoM1.toLocaleString('es-MX',{minimumFractionDigits:2})}</td>
+                        <td style="padding:8px;text-align:center;">
                             ${btnHtml}
                             ${m.ya_emitido ? 
-                                `<button onclick="window.anularContrato(${docenteId}, ${m.materia_id}, '${m.materia.replace(/'/g, "\\'")}')" 
-                                         style="margin-top:5px; padding:3px 8px; background:#ef4444; color:white; border:none; border-radius:4px; cursor:pointer; font-size:0.65rem; display:block; width:100%;">
-                                         🗑️ Anular
-                                 </button>` : ''}
+                                `<button onclick="window.anularContrato(${docenteId}, ${m.materia_id}, '${matEsc}')" 
+                                         style="margin-top:5px;padding:3px 8px;background:#ef4444;color:white;border:none;border-radius:4px;cursor:pointer;font-size:0.65rem;display:block;width:100%;">🗑️ Anular</button>` : ''}
                         </td>
                     </tr>`;
                 });
             }
-            htmlTabla += `<tr style="background:#f8fafc; font-weight:bold;">
-                <td colspan="3" style="padding:10px;text-align:right;">SUBTOTAL BRUTO MENSUAL:</td>
-                <td style="padding:10px;text-align:right;color:var(--color-maroon);font-family:monospace; font-size:1.05rem;">$${totalMensual.toLocaleString('es-MX', {minimumFractionDigits:2})} MXN</td>
-                <td></td>
-            </tr>
-            </table>
-            
+            htmlTabla += `</tbody></table>`;
+
+            const addMateriaHtml = `
             <div style="background:#f0fdf4; border:1px dashed #22c55e; padding:10px; border-radius:8px; margin-bottom:20px; font-size:0.85rem; display:flex; gap:10px; align-items:center;">
                 <input type="text" id="add-new-mat" placeholder="Nombre de Materia" style="flex:1; padding:6px; border:1px solid #ccc; border-radius:4px;" />
-                <input type="number" id="add-new-hrs" placeholder="Hrs" style="width:60px; padding:6px; border:1px solid #ccc; border-radius:4px;" />
+                <input type="number" id="add-new-hrs" placeholder="Hrs/mes" style="width:70px; padding:6px; border:1px solid #ccc; border-radius:4px;" title="Horas por mes (se aplica igual en los 4 meses)" />
                 <select id="add-new-lvl" style="padding:6px; border:1px solid #ccc; border-radius:4px;">
                     <option value="Licenciatura">Licenciatura</option>
                     <option value="Maestría">Maestría</option>
                     <option value="Técnico">Técnico</option>
+                    <option value="Doctorado">Doctorado</option>
                 </select>
                 <button onclick="window.agregarMateriaDinamica(${docenteId})" style="padding:6px 12px; background:#10b981; color:white; border:none; border-radius:4px; cursor:pointer;">+ Asignar</button>
-            </div>
-            `;
+            </div>`;
 
             // Alerta de 80 hrs
             let alertaHrs = '';
@@ -1157,10 +1259,11 @@ document.addEventListener('DOMContentLoaded', () => {
                     <strong style="font-size:1.2rem;">${nombre}</strong> (ID: ${docenteId})
                 </div>
                 <div style="background:#fefce8; border:1px solid #fef08a; padding:12px; border-radius:8px; margin-bottom:15px; font-size:0.85rem; color:#854d0e;">
-                    <strong>Instructivo:</strong> Agrega las materias libremente o ajusta las horas/nivel asignado. Los cambios se guardarán automáticamente en la base de datos al modificar.
+                    <strong>Instructivo:</strong> Edita las horas por mes (M1=Marzo, M2=Abril, M3=Mayo, M4=Junio) para cada materia. Los cambios se guardan automáticamente al modificar.
                 </div>
                 ${alertaHrs}
                 ${htmlTabla}
+                ${addMateriaHtml}
             `;
 
             document.getElementById('preview-contrato-content').innerHTML = infoHtml;
@@ -1177,12 +1280,51 @@ document.addEventListener('DOMContentLoaded', () => {
         }
     };
 
+    window.recalcPreviewMes = async function(inputEl) {
+        let newVal = parseFloat(inputEl.value) || 0;
+        if (newVal < 0) { newVal = 0; inputEl.value = 0; }
+
+        const docId = parseInt(inputEl.dataset.docid);
+        const materia = inputEl.dataset.mat;
+        const nivel = inputEl.dataset.nivel || 'Licenciatura';
+        const mesIdx = parseInt(inputEl.dataset.mes);
+
+        // Encontrar los otros inputs de la misma fila
+        const row = inputEl.closest('tr');
+        const inputs = row.querySelectorAll('input[type="number"]');
+        const vals = [0, 0, 0, 0];
+        inputs.forEach((inp, i) => { vals[i] = parseFloat(inp.value) || 0; });
+
+        inputEl.style.borderColor = '#f59e0b';
+        try {
+            const body = {
+                materia, nivel_pago: nivel,
+                horas_m1: vals[0], horas_m2: vals[1],
+                horas_m3: vals[2], horas_m4: vals[3]
+            };
+            const res = await fetch(`/api/asignacion/${docId}/horas`, {
+                method: 'PUT',
+                headers: {'Content-Type':'application/json'},
+                body: JSON.stringify(body)
+            });
+            if (!res.ok) throw new Error('Error guardando horas');
+            inputEl.style.borderColor = '#22c55e';
+            setTimeout(() => { inputEl.style.borderColor = ''; }, 1500);
+            // Refrescar preview silenciosamente
+            if (pendingContratoPayload) {
+                window.generarContrato(pendingContratoPayload.docente_id, pendingContratoPayload.nombre);
+            }
+        } catch(e) {
+            inputEl.style.borderColor = '#ef4444';
+            console.error('Error guardando horas', e);
+            alert('Error actualizando horas en base de datos: ' + e.message);
+        }
+    };
+
+    // Mantener compatibilidad (por si hay llamadas antiguas)
     window.recalcPreview = async function(inputEl, docId, matNombre, nivelActual) {
         let newVal = parseFloat(inputEl.value) || 0;
-        if (newVal < 0) {
-            newVal = 0;
-            inputEl.value = 0;
-        }
+        if (newVal < 0) { newVal = 0; inputEl.value = 0; }
         inputEl.disabled = true;
         try {
             await fetch(`/api/asignacion/${docId}/horas`, {
@@ -1190,10 +1332,7 @@ document.addEventListener('DOMContentLoaded', () => {
                 headers: {'Content-Type':'application/json'},
                 body: JSON.stringify({ horas: newVal, materia: matNombre, nivel_pago: nivelActual })
             });
-            // Recargar vista previa silenciosamente re-invocando la funcion en modo update
-            if(pendingContratoPayload) {
-                window.generarContrato(pendingContratoPayload.docente_id, pendingContratoPayload.nombre);
-            }
+            if(pendingContratoPayload) window.generarContrato(pendingContratoPayload.docente_id, pendingContratoPayload.nombre);
         } catch(e) {
             console.error('Error guardando horas', e);
             alert('Error actualizando horas en base de datos.');
@@ -1202,14 +1341,19 @@ document.addEventListener('DOMContentLoaded', () => {
         }
     };
 
-    window.recalcPreviewLevel = async function(selectEl, docId, matNombre, horasActuales) {
+    window.recalcPreviewLevel = async function(selectEl, docId, matNombre, m1, m2, m3, m4) {
         let nivel = selectEl.value;
         selectEl.disabled = true;
+        // m1..m4 pueden ser undefined si viene de código legacy, en ese caso usar 0
+        const hm1 = parseFloat(m1) || 0;
+        const hm2 = parseFloat(m2) || 0;
+        const hm3 = parseFloat(m3) || 0;
+        const hm4 = parseFloat(m4) || 0;
         try {
             await fetch(`/api/asignacion/${docId}/horas`, {
                 method: 'PUT',
                 headers: {'Content-Type':'application/json'},
-                body: JSON.stringify({ horas: horasActuales, materia: matNombre, nivel_pago: nivel })
+                body: JSON.stringify({ horas_m1: hm1, horas_m2: hm2, horas_m3: hm3, horas_m4: hm4, materia: matNombre, nivel_pago: nivel })
             });
             if(pendingContratoPayload) window.generarContrato(pendingContratoPayload.docente_id, pendingContratoPayload.nombre);
         } catch(e) {
@@ -1327,5 +1471,395 @@ document.addEventListener('DOMContentLoaded', () => {
         btnConfirm.innerHTML = "Cerrar Ventana";
         btnConfirm.onclick = () => window.closePreviewModal();
     }
+
+    // ==========================================
+    // QUICK ROLES — rellena credenciales de prueba
+    // ==========================================
+    function buildQuickButtons(users, listEl, userField, passField, roleFilter) {
+        const filtered = roleFilter ? users.filter(u => u.role === roleFilter) : users;
+        if (!filtered.length) {
+            listEl.innerHTML = '<span style="font-size:0.78rem;color:#f87171;">No hay usuarios con ese rol en la BD.</span>';
+            return;
+        }
+        listEl.innerHTML = '';
+        filtered.forEach(u => {
+            const btn = document.createElement('button');
+            btn.type = 'button';
+            btn.textContent = u.role + ' · ' + u.username;
+            btn.style.cssText = 'background:#1e3a5f;border:none;color:white;padding:5px 12px;border-radius:6px;cursor:pointer;font-size:0.8rem;font-weight:700;transition:opacity .15s;';
+            btn.onmouseover = () => btn.style.opacity = '0.8';
+            btn.onmouseout  = () => btn.style.opacity = '1';
+            btn.onclick = () => {
+                document.getElementById(userField).value = u.username;
+                document.getElementById(passField).value = u.username;
+            };
+            listEl.appendChild(btn);
+        });
+    }
+
+    async function loadQuickRoles() {
+        const listEl = document.getElementById('quick-roles-list');
+        if (!listEl) return;
+        listEl.innerHTML = '<span style="font-size:0.78rem;color:#94a3b8;">Cargando usuarios...</span>';
+        try {
+            const res = await fetch('/api/usuarios-roles');
+            if (!res.ok) {
+                listEl.innerHTML = '<span style="font-size:0.78rem;color:#f87171;">HTTP ' + res.status + '</span>';
+                return;
+            }
+            const users = await res.json();
+            console.log('[quick-roles] usuarios cargados:', users);
+            buildQuickButtons(users, listEl, 'login-user', 'login-pass', null);
+        } catch(e) {
+            console.error('[quick-roles] fetch fallo:', e);
+            listEl.innerHTML = '<span style="font-size:0.78rem;color:#f87171;">Sin conexión: ' + e.message + '</span>';
+        }
+    }
+
+    async function loadSemQuickUsers() {
+        const listEl = document.getElementById('sem-quick-list');
+        if (!listEl) return;
+        listEl.innerHTML = '<span style="font-size:0.78rem;color:#94a3b8;">Cargando...</span>';
+        try {
+            const res = await fetch('/api/usuarios-roles');
+            if (!res.ok) {
+                listEl.innerHTML = '<span style="font-size:0.78rem;color:#f87171;">HTTP ' + res.status + '</span>';
+                return;
+            }
+            const users = await res.json();
+            buildQuickButtons(users, listEl, 'admin-sem-user', 'admin-sem-pass', 'SEM');
+        } catch(e) {
+            listEl.innerHTML = '<span style="font-size:0.78rem;color:#f87171;">Sin conexión</span>';
+        }
+    }
+
+    // ==========================================
+    // ADMIN SEM — Gestión de Planteles
+    // ==========================================
+    const ROLE_COLORS = {
+        'ADM':  '#1e3a5f', 'SEM':  '#4c1d95', 'DIR':  '#065f46',
+        'JSA':  '#7c3aed', 'ICI':  '#b45309', 'ICE':  '#0369a1',
+        'II':   '#065f46', 'IC':   '#9a3412', 'TC':   '#374151',
+        'MED':  '#be185d', 'ODO':  '#0f766e', 'ENF':  '#0c4a6e'
+    };
+
+    async function loadAdminEscuelas() {
+        const el = document.getElementById('admin-escuelas-lista');
+        if (!el) return;
+        el.innerHTML = '<span style="color:rgba(255,255,255,0.5);font-size:0.9rem;">Cargando...</span>';
+        try {
+            const res = await fetch('/api/escuelas');
+            const data = await res.json();
+            if (!data.length) {
+                el.innerHTML = '<span style="color:rgba(255,255,255,0.5);">No hay planteles configurados aún. Use el formulario de abajo.</span>';
+                return;
+            }
+            // Cargar detalles de cada plantel en paralelo
+            el.innerHTML = '<span style="color:rgba(255,255,255,0.5);font-size:0.85rem;">Obteniendo detalles...</span>';
+            const detalles = await Promise.all(data.map(r =>
+                fetch(`/api/escuelas/${r.datname}/detalle`).then(x => x.json()).catch(() => ({status:'error', database: r.datname}))
+            ));
+
+            el.innerHTML = '';
+            detalles.forEach(d => {
+                const card = document.createElement('div');
+                card.style.cssText = 'background:rgba(255,255,255,0.08);border:1px solid rgba(255,255,255,0.18);border-radius:14px;padding:18px 20px;margin-bottom:14px;';
+
+                const siglas = d.database ? d.database.replace('gestion_docente_','').toUpperCase() : '?';
+                const carreras = d.carreras || [];
+                const usuarios = d.usuarios || [];
+                const docentes = d.totalDocentes || 0;
+
+                const carrerasBadges = carreras.map(c =>
+                    `<span style="background:rgba(195,163,100,0.25);border:1px solid rgba(195,163,100,0.5);color:#fde68a;padding:3px 10px;border-radius:12px;font-size:0.75rem;font-weight:700;margin:2px;display:inline-block;">${c.siglas}</span>`
+                ).join('');
+
+                const usersBadges = usuarios.map(u => {
+                    const bg = ROLE_COLORS[u.role] || '#374151';
+                    return `<span style="background:${bg};color:white;padding:3px 10px;border-radius:12px;font-size:0.72rem;font-weight:700;margin:2px;display:inline-block;" title="${u.role}">${u.username}</span>`;
+                }).join('');
+
+                card.innerHTML = `
+                    <div style="display:flex;justify-content:space-between;align-items:flex-start;margin-bottom:10px;">
+                        <div>
+                            <div style="display:flex;align-items:center;gap:10px;">
+                                <span style="font-size:1.4rem;">🏫</span>
+                                <div>
+                                    <div style="color:white;font-weight:800;font-size:1rem;">${siglas}</div>
+                                    <div style="color:rgba(255,255,255,0.5);font-size:0.78rem;">${d.database}</div>
+                                </div>
+                            </div>
+                        </div>
+                        <div style="display:flex;gap:8px;align-items:center;">
+                            <span style="background:rgba(255,255,255,0.1);color:rgba(255,255,255,0.8);padding:4px 12px;border-radius:20px;font-size:0.78rem;font-weight:700;">👨‍🏫 ${docentes} docentes</span>
+                            <button onclick="window.semAbrirGestionPlantel('${d.database}')"
+                                style="background:var(--color-gold);color:#1a0a00;border:none;padding:6px 14px;border-radius:8px;cursor:pointer;font-size:0.8rem;font-weight:800;">⚙️ Gestionar</button>
+                        </div>
+                    </div>
+                    <div style="margin-bottom:8px;">
+                        <div style="color:rgba(255,255,255,0.6);font-size:0.72rem;text-transform:uppercase;letter-spacing:0.5px;margin-bottom:5px;">Carreras (${carreras.length})</div>
+                        <div>${carrerasBadges || '<em style="color:rgba(255,255,255,0.3);font-size:0.8rem;">Sin carreras configuradas</em>'}</div>
+                    </div>
+                    <div>
+                        <div style="color:rgba(255,255,255,0.6);font-size:0.72rem;text-transform:uppercase;letter-spacing:0.5px;margin-bottom:5px;">Usuarios (${usuarios.length})</div>
+                        <div>${usersBadges || '<em style="color:rgba(255,255,255,0.3);font-size:0.8rem;">Sin usuarios</em>'}</div>
+                    </div>
+                `;
+                el.appendChild(card);
+            });
+        } catch(e) {
+            el.innerHTML = `<span style="color:#fca5a5;">Error al cargar: ${e.message}</span>`;
+        }
+    }
+
+    // Modal de gestión rápida de plantel existente
+    window.semAbrirGestionPlantel = async function(dbname) {
+        const siglas = dbname.replace('gestion_docente_','').toUpperCase();
+        // Obtener detalle fresco
+        let detalle = {};
+        try {
+            const r = await fetch(`/api/escuelas/${dbname}/detalle`);
+            detalle = await r.json();
+        } catch(e) { detalle = { carreras: [], usuarios: [] }; }
+
+        const carreras = detalle.carreras || [];
+        const usuarios = detalle.usuarios || [];
+
+        const TODAS_CARRERAS = [
+            {s:'ICI', n:'Ing. Computación e Informática'},
+            {s:'ICE', n:'Ing. Comunicaciones y Electrónica'},
+            {s:'II',  n:'Ing. Industrial'},
+            {s:'IC',  n:'Ing. Construcción Militar'},
+            {s:'TC',  n:'Tronco Común'},
+            {s:'MED', n:'Medicina'},
+            {s:'ODO', n:'Odontología'},
+            {s:'ENF', n:'Enfermería'},
+            {s:'FAR', n:'Farmacología'},
+            {s:'BIO', n:'Biología'},
+        ];
+        const existingSiglas = carreras.map(c => c.siglas);
+
+        const ROLES = ['ADM', 'DIR', 'JSA', 'SEM', 'ICI', 'ICE', 'II', 'IC', 'TC', 'MED', 'ODO', 'ENF'];
+
+        const usuariosHtml = usuarios.map(u => {
+            const bg = ROLE_COLORS[u.role] || '#374151';
+            return `<div style="display:flex;align-items:center;gap:8px;padding:6px 10px;background:#f8fafc;border-radius:8px;margin-bottom:6px;">
+                <span style="background:${bg};color:white;padding:2px 10px;border-radius:10px;font-size:0.72rem;font-weight:800;">${u.role}</span>
+                <span style="font-family:monospace;font-weight:700;font-size:0.88rem;">${u.username}</span>
+            </div>`;
+        }).join('');
+
+        const carrerasCheckHtml = TODAS_CARRERAS.map(c =>
+            `<label style="display:flex;align-items:center;gap:5px;font-size:0.85rem;cursor:pointer;padding:4px 8px;border-radius:6px;${existingSiglas.includes(c.s) ? 'background:#d1fae5;color:#065f46;font-weight:700;' : ''}">` +
+            `<input type="checkbox" value="${c.s}" class="gp-car-chk" ${existingSiglas.includes(c.s) ? 'checked disabled' : ''}> ` +
+            `<strong>${c.s}</strong> — ${c.n}${existingSiglas.includes(c.s) ? ' ✅' : ''}</label>`
+        ).join('');
+
+        const rolesOpts = ROLES.map(r => `<option value="${r}">${r}</option>`).join('');
+
+        // Crear modal inline
+        let modal = document.getElementById('sem-gestion-modal');
+        if (!modal) {
+            modal = document.createElement('div');
+            modal.id = 'sem-gestion-modal';
+            modal.style.cssText = 'position:fixed;top:0;left:0;right:0;bottom:0;background:rgba(0,0,0,0.7);z-index:5000;display:flex;justify-content:center;align-items:flex-start;overflow-y:auto;padding:30px 20px;backdrop-filter:blur(4px);';
+            document.body.appendChild(modal);
+        }
+        modal.style.display = 'flex';
+        modal.innerHTML = `
+        <div style="background:white;width:100%;max-width:700px;border-radius:20px;overflow:hidden;box-shadow:0 30px 80px rgba(0,0,0,0.5);margin:auto;">
+            <div style="background:linear-gradient(135deg,#1e3a5f,#2563eb);padding:22px 28px;display:flex;justify-content:space-between;align-items:center;">
+                <div>
+                    <div style="color:rgba(255,255,255,0.7);font-size:0.75rem;text-transform:uppercase;letter-spacing:1px;">Panel SEM — Configuración Rápida</div>
+                    <h3 style="color:white;margin:4px 0 0;font-size:1.15rem;font-weight:800;">⚙️ Gestionar Plantel: ${siglas}</h3>
+                </div>
+                <button onclick="document.getElementById('sem-gestion-modal').style.display='none'" style="background:rgba(255,255,255,0.15);border:1px solid rgba(255,255,255,0.3);color:white;border-radius:50%;width:34px;height:34px;cursor:pointer;font-size:1.1rem;">×</button>
+            </div>
+            <div style="padding:24px 28px;">
+                <!-- Usuarios actuales -->
+                <div style="margin-bottom:22px;">
+                    <h4 style="color:#1e3a5f;font-size:0.9rem;text-transform:uppercase;letter-spacing:1px;margin-bottom:10px;">👥 Usuarios Actuales (${usuarios.length})</h4>
+                    <div style="max-height:160px;overflow-y:auto;padding:4px;">${usuariosHtml || '<em style="color:#aaa;">Sin usuarios registrados</em>'}</div>
+                </div>
+
+                <!-- Agregar / actualizar usuario -->
+                <div style="background:#f8fafc;border:1.5px solid #e2e8f0;border-radius:12px;padding:16px;margin-bottom:22px;">
+                    <h4 style="color:#1e3a5f;font-size:0.88rem;text-transform:uppercase;letter-spacing:1px;margin-bottom:12px;">➕ Agregar / Actualizar Usuario</h4>
+                    <div style="display:grid;grid-template-columns:1fr 1fr 120px;gap:10px;margin-bottom:10px;">
+                        <div>
+                            <label style="font-size:0.75rem;font-weight:700;color:#475569;display:block;margin-bottom:4px;">USUARIO</label>
+                            <input id="gp-uname" placeholder="Ej: jefe_ici" style="width:100%;padding:8px 10px;border:1.5px solid #e2e8f0;border-radius:8px;font-size:0.9rem;box-sizing:border-box;">
+                        </div>
+                        <div>
+                            <label style="font-size:0.75rem;font-weight:700;color:#475569;display:block;margin-bottom:4px;">CONTRASEÑA</label>
+                            <input id="gp-upass" placeholder="Contraseña" style="width:100%;padding:8px 10px;border:1.5px solid #e2e8f0;border-radius:8px;font-size:0.9rem;box-sizing:border-box;">
+                        </div>
+                        <div>
+                            <label style="font-size:0.75rem;font-weight:700;color:#475569;display:block;margin-bottom:4px;">ROL</label>
+                            <select id="gp-urole" style="width:100%;padding:8px 10px;border:1.5px solid #e2e8f0;border-radius:8px;font-size:0.88rem;">
+                                ${rolesOpts}
+                            </select>
+                        </div>
+                    </div>
+                    <div style="display:flex;gap:8px;flex-wrap:wrap;margin-bottom:10px;">
+                        <button onclick="window.semQuickRole('${dbname}','ADM','admin','admin')" style="padding:5px 12px;background:#1e3a5f;color:white;border:none;border-radius:6px;cursor:pointer;font-size:0.78rem;font-weight:700;">+ ADM</button>
+                        <button onclick="window.semQuickRole('${dbname}','DIR','director','director')" style="padding:5px 12px;background:#065f46;color:white;border:none;border-radius:6px;cursor:pointer;font-size:0.78rem;font-weight:700;">+ DIR</button>
+                        <button onclick="window.semQuickRole('${dbname}','JSA','jsa','jsa')" style="padding:5px 12px;background:#7c3aed;color:white;border:none;border-radius:6px;cursor:pointer;font-size:0.78rem;font-weight:700;">+ JSA</button>
+                        ${existingSiglas.map(s => `<button onclick="window.semQuickRole('${dbname}','${s}','jefe_${s.toLowerCase()}','jefe_${s.toLowerCase()}')" style="padding:5px 12px;background:${ROLE_COLORS[s]||'#374151'};color:white;border:none;border-radius:6px;cursor:pointer;font-size:0.78rem;font-weight:700;">+ J. ${s}</button>`).join('')}
+                    </div>
+                    <div id="gp-user-msg" style="min-height:18px;font-size:0.82rem;margin-bottom:8px;"></div>
+                    <button onclick="window.semAgregarUsuarioPlantel('${dbname}')" style="background:var(--color-maroon);color:white;border:none;padding:9px 20px;border-radius:9px;cursor:pointer;font-weight:700;font-size:0.9rem;">💾 Guardar Usuario</button>
+                </div>
+
+                <!-- Carreras -->
+                <div style="background:#f8fafc;border:1.5px solid #e2e8f0;border-radius:12px;padding:16px;">
+                    <h4 style="color:#1e3a5f;font-size:0.88rem;text-transform:uppercase;letter-spacing:1px;margin-bottom:12px;">📚 Carreras del Plantel</h4>
+                    <div style="display:grid;grid-template-columns:1fr 1fr;gap:6px;margin-bottom:12px;">${carrerasCheckHtml}</div>
+                    <div id="gp-car-msg" style="min-height:18px;font-size:0.82rem;margin-bottom:8px;"></div>
+                    <button onclick="window.semAgregarCarrerasPlantel('${dbname}')" style="background:#0369a1;color:white;border:none;padding:9px 20px;border-radius:9px;cursor:pointer;font-weight:700;font-size:0.9rem;">📚 Guardar Carreras Seleccionadas</button>
+                </div>
+            </div>
+        </div>`;
+    };
+
+    window.semQuickRole = function(dbname, role, username, password) {
+        document.getElementById('gp-uname').value  = username;
+        document.getElementById('gp-upass').value  = password;
+        document.getElementById('gp-urole').value  = role;
+    };
+
+    window.semAgregarUsuarioPlantel = async function(dbname) {
+        const uname = document.getElementById('gp-uname').value.trim();
+        const upass = document.getElementById('gp-upass').value.trim();
+        const urole = document.getElementById('gp-urole').value;
+        const msgEl = document.getElementById('gp-user-msg');
+        if (!uname || !upass) { msgEl.innerHTML = '<span style="color:#dc2626;">⚠️ Usuario y contraseña son requeridos.</span>'; return; }
+        msgEl.innerHTML = '<span style="color:#0369a1;">Guardando...</span>';
+        try {
+            const res = await fetch(`/api/escuelas/${dbname}/usuario`, {
+                method: 'POST',
+                headers: {'Content-Type':'application/json'},
+                body: JSON.stringify({ username: uname, password: upass, role: urole })
+            });
+            const data = await res.json();
+            if (data.status === 'ok') {
+                const action = data.action === 'updated' ? 'actualizado' : 'creado';
+                msgEl.innerHTML = `<span style="color:#065f46;">✅ Usuario <strong>${uname}</strong> ${action} con rol <strong>${urole}</strong>.</span>`;
+                // Refrescar modal
+                setTimeout(() => window.semAbrirGestionPlantel(dbname), 800);
+                loadAdminEscuelas();
+            } else {
+                msgEl.innerHTML = `<span style="color:#dc2626;">✘ ${data.message}</span>`;
+            }
+        } catch(e) {
+            msgEl.innerHTML = `<span style="color:#dc2626;">✘ Error: ${e.message}</span>`;
+        }
+    };
+
+    window.semAgregarCarrerasPlantel = async function(dbname) {
+        const checks = document.querySelectorAll('.gp-car-chk:not(:disabled):checked');
+        const msgEl = document.getElementById('gp-car-msg');
+        if (!checks.length) { msgEl.innerHTML = '<span style="color:#f59e0b;">⚠️ Selecciona al menos una carrera nueva.</span>'; return; }
+        msgEl.innerHTML = '<span style="color:#0369a1;">Guardando...</span>';
+        let ok = 0, fail = 0;
+        for (const chk of checks) {
+            try {
+                const res = await fetch(`/api/escuelas/${dbname}/carrera`, {
+                    method: 'POST',
+                    headers: {'Content-Type':'application/json'},
+                    body: JSON.stringify({ siglas: chk.value })
+                });
+                const d = await res.json();
+                if (d.status === 'ok') ok++; else fail++;
+            } catch { fail++; }
+        }
+        msgEl.innerHTML = ok > 0
+            ? `<span style="color:#065f46;">✅ ${ok} carrera(s) agregada(s)${fail>0?' · '+fail+' error(es)':''}.</span>`
+            : `<span style="color:#dc2626;">✘ No se pudo agregar ninguna carrera.</span>`;
+        if (ok > 0) { setTimeout(() => window.semAbrirGestionPlantel(dbname), 800); loadAdminEscuelas(); }
+    };
+
+    window.toggleFormNuevoPlantel = function() {
+        const form = document.getElementById('form-nuevo-plantel');
+        const btn = document.getElementById('btn-toggle-form-plantel');
+        const visible = form.style.display !== 'none';
+        form.style.display = visible ? 'none' : 'block';
+        btn.textContent = visible ? '+ Expandir' : '− Colapsar';
+    };
+
+    window.npAgregarUsuario = function() {
+        const row = document.createElement('div');
+        row.style.cssText = 'display:grid;grid-template-columns:1fr 1fr 120px 40px;gap:8px;margin-bottom:8px;';
+        row.innerHTML = `
+            <input type="text" placeholder="Usuario" class="np-u-user" style="padding:8px 10px;border:1.5px solid #e2e8f0;border-radius:7px;font-size:0.88rem;">
+            <input type="text" placeholder="Contraseña" class="np-u-pass" style="padding:8px 10px;border:1.5px solid #e2e8f0;border-radius:7px;font-size:0.88rem;">
+            <select class="np-u-role" style="padding:8px 10px;border:1.5px solid #e2e8f0;border-radius:7px;font-size:0.88rem;">
+                <option>ADM</option><option>DIR</option><option>SEM</option><option>JSA</option>
+                <option>ICI</option><option>ICE</option><option>II</option><option>IC</option><option>TC</option>
+            </select>
+            <button type="button" onclick="this.parentElement.remove()" style="background:#fee2e2;color:#dc2626;border:none;border-radius:7px;cursor:pointer;font-weight:700;">✕</button>
+        `;
+        document.getElementById('np-usuarios-rows').appendChild(row);
+    };
+
+    window.npGuardarPlantel = async function() {
+        const siglas  = document.getElementById('np-siglas').value.trim();
+        const nombre  = document.getElementById('np-nombre').value.trim();
+        const ciclo   = document.getElementById('np-ciclo').value.trim();
+        const director= document.getElementById('np-director').value.trim();
+        if (!siglas || !nombre || !ciclo) { alert('Siglas, Nombre y Ciclo son obligatorios.'); return; }
+
+        const carreras = Array.from(document.querySelectorAll('#np-carreras-checks input:checked')).map(c => c.value);
+        const usuarios = [];
+        document.querySelectorAll('#np-usuarios-rows > div').forEach(row => {
+            const u = row.querySelector('.np-u-user').value.trim();
+            const p = row.querySelector('.np-u-pass').value.trim();
+            const r = row.querySelector('.np-u-role').value;
+            if (u && p) usuarios.push({ username: u, password: p, role: r });
+        });
+
+        const payload = {
+            siglas, nombre, ciclo, director, carreras, usuarios,
+            dbHost: document.getElementById('np-dbhost').value.trim(),
+            dbPort: document.getElementById('np-dbport').value.trim(),
+        };
+        const dbName = document.getElementById('np-dbname').value.trim();
+        const dbUser = document.getElementById('np-dbuser').value.trim();
+        const dbPass = document.getElementById('np-dbpass').value;
+        if (dbName) payload.dbName = dbName;
+        if (dbUser) payload.dbUser = dbUser;
+        if (dbPass) payload.dbPass = dbPass;
+
+        const msgEl = document.getElementById('np-result-msg');
+        const btn = document.querySelector('#form-nuevo-plantel .btn-action');
+        const ogText = btn.innerHTML;
+        btn.innerHTML = 'Configurando...';
+        btn.disabled = true;
+        msgEl.innerHTML = '';
+
+        try {
+            const res = await fetch('/api/escuela/configurar', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify(payload)
+            });
+            const data = await res.json();
+            if (data.status !== 'error') {
+                msgEl.innerHTML = `<div style="background:#d1fae5;color:#065f46;padding:10px 14px;border-radius:8px;font-weight:600;font-size:0.9rem;">
+                    ✔ ${data.message}
+                    ${data.carrerasInsertadas?.length ? ' · Carreras: ' + data.carrerasInsertadas.join(', ') : ''}
+                    ${data.usuariosCreados?.length ? ' · Usuarios: ' + data.usuariosCreados.map(u=>u.username).join(', ') : ''}
+                </div>`;
+                loadAdminEscuelas();
+            } else {
+                msgEl.innerHTML = `<div style="background:#fee2e2;color:#dc2626;padding:10px 14px;border-radius:8px;font-weight:600;font-size:0.9rem;">✘ ${data.message}</div>`;
+            }
+        } catch {
+            msgEl.innerHTML = `<div style="background:#fee2e2;color:#dc2626;padding:10px 14px;border-radius:8px;font-weight:600;font-size:0.9rem;">✘ Error de conexión.</div>`;
+        } finally {
+            btn.innerHTML = ogText;
+            btn.disabled = false;
+        }
+    };
 
 });

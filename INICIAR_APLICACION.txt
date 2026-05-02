@@ -1,0 +1,73 @@
+===============================================================
+  SGDC-UDEFA — CÓMO INICIAR LA APLICACIÓN
+  Sistema de Gestión Docente — EMI / SEDENA
+===============================================================
+
+REQUISITOS PREVIOS
+------------------
+  - Java 17 instalado (ya está en este equipo: OpenJDK 17.0.18)
+  - PostgreSQL corriendo en localhost:5432
+  - Base de datos: gestion_docente_emi
+  - Usuario BD: postgres  /  Contraseña: 1234
+  - Maven descargado en: C:\tools\apache-maven-3.9.9\
+
+
+PASO 1 — Abrir PowerShell
+--------------------------
+  Presiona  Win + X  y elige "Windows PowerShell"
+  (o busca "PowerShell" en el menú inicio)
+
+
+PASO 2 — Agregar Maven al PATH de esta sesión
+----------------------------------------------
+  Copia y pega este comando:
+
+    $env:Path = "C:\tools\apache-maven-3.9.9\bin;" + $env:Path
+
+
+PASO 3 — Ir a la carpeta del proyecto
+--------------------------------------
+  Copia y pega este comando:
+
+    cd C:\temp\gestion-docente-web\backend
+
+
+PASO 4 — Iniciar la aplicación
+--------------------------------
+  Copia y pega este comando:
+
+    mvn spring-boot:run
+
+  La primera vez puede tardar 1-2 minutos (descarga dependencias).
+  Las siguientes veces arranca en unos 5 segundos.
+
+  Cuando veas este mensaje, ya está lista:
+    "Started GestionDocenteApplication in X seconds"
+
+
+PASO 5 — Abrir en el navegador
+--------------------------------
+  Abre tu navegador y entra a:
+
+    http://localhost:8091/sgdc-udefa
+
+
+PASO 6 — Detener la aplicación
+--------------------------------
+  En la ventana de PowerShell donde corre, presiona:
+
+    Ctrl + C
+
+
+===============================================================
+  CONFIGURACIÓN DE LA BASE DE DATOS (application.properties)
+===============================================================
+
+  Archivo: C:\temp\gestion-docente-web\backend\src\main\resources\application.properties
+
+  spring.datasource.url=jdbc:postgresql://localhost:5432/gestion_docente_emi
+  spring.datasource.username=postgres
+  spring.datasource.password=1234
+  server.port=8091
+
+===============================================================

@@ -44,43 +44,39 @@ public class PresupuestoController {
             if (horas == null) horas = BigDecimal.ZERO;
             
             String nivelPago = (String) r.get("nivel_pago");
-            if (nivelPago == null) nivelPago = "Licenciatura"; // default
-            
-            BigDecimal tarifa = new BigDecimal("486.71");
-            if (nivelPago.equalsIgnoreCase("Maestría")) {
-                tarifa = new BigDecimal("851.75");
-            } else if (nivelPago.equalsIgnoreCase("Técnico")) {
-                tarifa = new BigDecimal("231.19");
+            if (nivelPago == null) nivelPago = "Licenciatura";
+
+            // Tarifas IpmHorasC de BASE SUELDOS (igual que ContratoController)
+            BigDecimal tarifa;
+            switch (nivelPago.toLowerCase()) {
+                case "doctorado":                      tarifa = new BigDecimal("1048.95"); break;
+                case "maestría": case "maestria":      tarifa = new BigDecimal("734.27");  break;
+                case "técnico":  case "tecnico":       tarifa = new BigDecimal("199.30");  break;
+                default:                               tarifa = new BigDecimal("419.58");  break; // Licenciatura
             }
-            
-            BigDecimal subtotal = horas.multiply(tarifa);
-            
-            // Impuestos calculation
+
+            BigDecimal subtotal = horas.multiply(tarifa).setScale(2, java.math.RoundingMode.HALF_UP);
+
             String regimen = (String) r.get("regimen_sat");
-            if (regimen == null) regimen = "RS";
-            
-            BigDecimal ivaRate = new BigDecimal("0.16");
-            BigDecimal retIvaRate = new BigDecimal("0.106667");
-            
-            BigDecimal isrRetRate = BigDecimal.ZERO;
-            if (regimen.equalsIgnoreCase("RESICO")) {
-                isrRetRate = new BigDecimal("0.0125");
-            } else if (regimen.equalsIgnoreCase("SP")) {
-                isrRetRate = new BigDecimal("0.10");
-            } else {
-                // Para RS, asumiremos 10% fijo para el reporte, o 0 si no se retiene directo
-                isrRetRate = new BigDecimal("0.10");
-            }
-            
-            BigDecimal iva = BigDecimal.ZERO;
+            if (regimen == null) regimen = "SP";
+
+            BigDecimal iva    = BigDecimal.ZERO;
             BigDecimal retIva = BigDecimal.ZERO;
-            BigDecimal retIsr = subtotal.multiply(isrRetRate);
-            
-            if (regimen.equalsIgnoreCase("SP") || regimen.equalsIgnoreCase("RESICO")) {
-                iva = subtotal.multiply(ivaRate);
-                retIva = subtotal.multiply(retIvaRate);
+            BigDecimal retIsr;
+
+            boolean esResico = regimen.equalsIgnoreCase("RESICO");
+            // SP y RESICO: IVA 16% + retención IVA 10.67%
+            // RS (Sueldos y Salarios asimilados): sin IVA ni retención
+            boolean aplicaIvaRiva = !regimen.equalsIgnoreCase("RS");
+
+            if (aplicaIvaRiva) {
+                iva    = subtotal.multiply(new BigDecimal("0.16"))    .setScale(2, java.math.RoundingMode.HALF_UP);
+                retIva = subtotal.multiply(new BigDecimal("0.106667")).setScale(2, java.math.RoundingMode.HALF_UP);
             }
-            
+            // ISR: SP/RS → 10%, RESICO → 1.25%
+            BigDecimal tasaIsr = esResico ? new BigDecimal("0.0125") : new BigDecimal("0.10");
+            retIsr = subtotal.multiply(tasaIsr).setScale(2, java.math.RoundingMode.HALF_UP);
+
             BigDecimal neto = subtotal.add(iva).subtract(retIva).subtract(retIsr);
             
             map.put("tarifa", tarifa);

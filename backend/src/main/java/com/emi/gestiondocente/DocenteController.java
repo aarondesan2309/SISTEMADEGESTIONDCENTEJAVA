@@ -54,16 +54,98 @@ public class DocenteController {
 
     // =============================================
     // GET /api/docentes-select — Para combo/select
+    // Acepta ?carrera=ICI para filtrar por carrera
     // =============================================
     @GetMapping("/docentes-select")
-    public ResponseEntity<List<Map<String, Object>>> getDocentesSelect() {
-        String sql = """
-            SELECT docente_id, nombre, condicion
-            FROM Docente
-            ORDER BY nombre ASC
-            """;
-        List<Map<String, Object>> result = jdbcTemplate.queryForList(sql);
+    public ResponseEntity<List<Map<String, Object>>> getDocentesSelect(
+            @RequestParam(required = false) String carrera) {
+        List<Map<String, Object>> result;
+        if (carrera != null && !carrera.isBlank()) {
+            String sql = """
+                SELECT DISTINCT d.docente_id, d.nombre, d.condicion
+                FROM Docente d
+                JOIN Asignacion a ON d.docente_id = a.docente_id
+                JOIN Materia m ON a.materia_id = m.materia_id
+                JOIN Carrera c ON m.carrera_id = c.carrera_id
+                WHERE c.siglas = ?
+                ORDER BY d.nombre ASC
+                """;
+            result = jdbcTemplate.queryForList(sql, carrera);
+        } else {
+            String sql = """
+                SELECT docente_id, nombre, condicion
+                FROM Docente
+                ORDER BY nombre ASC
+                """;
+            result = jdbcTemplate.queryForList(sql);
+        }
         return ResponseEntity.ok(result);
+    }
+
+    // =============================================
+    // GET /api/docentes/stats?carrera=ICI — Para JSA
+    // =============================================
+    @GetMapping("/docentes/stats")
+    public ResponseEntity<Map<String, Object>> getDocentesStats(
+            @RequestParam(required = false) String carrera) {
+        Map<String, Object> result = new HashMap<>();
+        try {
+            if (carrera != null && !carrera.isBlank()) {
+                Map<String, Object> row = jdbcTemplate.queryForMap("""
+                    SELECT
+                        COUNT(*) AS total,
+                        SUM(CASE WHEN d.condicion = 'Personal Civil' THEN 1 ELSE 0 END) AS civiles,
+                        SUM(CASE WHEN d.condicion = 'Personal Militar' THEN 1 ELSE 0 END) AS militares
+                    FROM (
+                        SELECT DISTINCT d.docente_id, d.condicion
+                        FROM Docente d
+                        JOIN Asignacion a ON d.docente_id = a.docente_id
+                        JOIN Materia m ON a.materia_id = m.materia_id
+                        JOIN Carrera c ON m.carrera_id = c.carrera_id
+                        WHERE c.siglas = ?
+                    ) d
+                    """, carrera);
+                result.put("carrera", carrera);
+                result.put("total", row.get("total"));
+                result.put("civiles", row.get("civiles"));
+                result.put("militares", row.get("militares"));
+            } else {
+                Map<String, Object> row = jdbcTemplate.queryForMap("""
+                    SELECT COUNT(*) AS total,
+                        SUM(CASE WHEN condicion = 'Personal Civil' THEN 1 ELSE 0 END) AS civiles,
+                        SUM(CASE WHEN condicion = 'Personal Militar' THEN 1 ELSE 0 END) AS militares
+                    FROM Docente
+                    """);
+                result.put("carrera", "TODAS");
+                result.put("total", row.get("total"));
+                result.put("civiles", row.get("civiles"));
+                result.put("militares", row.get("militares"));
+            }
+        } catch (Exception e) {
+            result.put("total", 0); result.put("civiles", 0); result.put("militares", 0);
+        }
+        return ResponseEntity.ok(result);
+    }
+
+    // =============================================
+    // GET /api/resumen-director — Para DIR
+    // =============================================
+    @GetMapping("/resumen-director")
+    public ResponseEntity<List<Map<String, Object>>> getResumenDirector() {
+        String sql = """
+            SELECT c.siglas AS carrera, c.nombre AS nombre_carrera,
+                COUNT(DISTINCT d.docente_id) AS total_docentes,
+                COUNT(DISTINCT CASE WHEN d.condicion = 'Personal Civil' THEN d.docente_id END) AS civiles,
+                COUNT(DISTINCT CASE WHEN d.condicion = 'Personal Militar' THEN d.docente_id END) AS militares,
+                COALESCE(SUM(a.horas), 0) AS total_horas
+            FROM Carrera c
+            LEFT JOIN Materia m ON m.carrera_id = c.carrera_id
+            LEFT JOIN Asignacion a ON a.materia_id = m.materia_id
+            LEFT JOIN Docente d ON d.docente_id = a.docente_id
+            GROUP BY c.carrera_id, c.siglas, c.nombre
+            ORDER BY c.siglas ASC
+            """;
+        return ResponseEntity.ok(jdbcTemplate.queryForList(sql));
     }
 
     // =============================================
@@ -107,34 +189,34 @@ public class DocenteController {
             );
 
             if (newId != null && materia != null && !materia.isEmpty()) {
-                final String carreraFinal = (carrera != null && !carrera.isEmpty()) ? carrera : "";
-                final String materiaFinal = materia;
                 final int docenteId = newId;
 
-                jdbcTemplate.execute(
-                    String.format("""
-                        DO $$
-                        DECLARE
-                            v_carrera_id INT;
-                            v_materia_id INT;
-                        BEGIN
-                            SELECT carrera_id INTO v_carrera_id FROM carrera WHERE siglas = '%s' LIMIT 1;
-                            IF NOT FOUND THEN
-                                SELECT carrera_id INTO v_carrera_id FROM carrera LIMIT 1;
-                            END IF;
-                            SELECT materia_id INTO v_materia_id FROM materia WHERE nombre = '%s' LIMIT 1;
-                            IF NOT FOUND THEN
-                                INSERT INTO materia(nombre, carrera_id) VALUES('%s', v_carrera_id) RETURNING materia_id INTO v_materia_id;
-                            END IF;
-                            INSERT INTO asignacion(docente_id, materia_id, horas) VALUES(%d, v_materia_id, 16);
-                        END $$;
-                        """,
-                        carreraFinal.replace("'", "''"),
-                        materiaFinal.replace("'", "''"),
-                        materiaFinal.replace("'", "''"),
-                        docenteId
-                    )
-                );
+                // Buscar carrera por siglas (con parámetro)
+                List<Map<String,Object>> carreraRows = carrera != null && !carrera.isEmpty()
+                    ? jdbcTemplate.queryForList("SELECT carrera_id FROM carrera WHERE siglas = ? LIMIT 1", carrera)
+                    : List.of();
+                Integer carreraId;
+                if (!carreraRows.isEmpty()) {
+                    carreraId = ((Number) carreraRows.get(0).get("carrera_id")).intValue();
+                } else {
+                    carreraId = jdbcTemplate.queryForObject("SELECT carrera_id FROM carrera LIMIT 1", Integer.class);
+                }
+
+                // Buscar o crear materia (con parámetros)
+                List<Map<String,Object>> materiaRows = jdbcTemplate.queryForList(
+                    "SELECT materia_id FROM materia WHERE nombre = ? LIMIT 1", materia);
+                Integer materiaId;
+                if (!materiaRows.isEmpty()) {
+                    materiaId = ((Number) materiaRows.get(0).get("materia_id")).intValue();
+                } else {
+                    materiaId = jdbcTemplate.queryForObject(
+                        "INSERT INTO materia(nombre, carrera_id) VALUES(?, ?) RETURNING materia_id",
+                        Integer.class, materia, carreraId);
+                }
+
+                jdbcTemplate.update(
+                    "INSERT INTO asignacion(docente_id, materia_id, horas) VALUES(?, ?, 16)",
+                    docenteId, materiaId);
             }
 
             Map<String, Object> result = new HashMap<>();
@@ -196,6 +278,36 @@ public class DocenteController {
             Map<String, Object> error = new HashMap<>();
             error.put("status", "error");
             error.put("message", e.getMessage());
+            return ResponseEntity.internalServerError().body(error);
+        }
+    }
+
+    // =============================================
+    // DELETE /api/docentes/{id} — Eliminar docente
+    // =============================================
+    @DeleteMapping("/docentes/{id}")
+    public ResponseEntity<Map<String, Object>> deleteDocente(@PathVariable int id) {
+        try {
+            jdbcTemplate.update("DELETE FROM expediente_documento WHERE docente_id = ?", id);
+            jdbcTemplate.update("DELETE FROM Evaluacion WHERE docente_id = ?", id);
+            jdbcTemplate.update("DELETE FROM Vehiculo WHERE docente_id = ?", id);
+            jdbcTemplate.update("DELETE FROM contrato_emitido WHERE docente_id = ?", id);
+            jdbcTemplate.update("DELETE FROM Asignacion WHERE docente_id = ?", id);
+            int rows = jdbcTemplate.update("DELETE FROM Docente WHERE docente_id = ?", id);
+            Map<String, Object> result = new HashMap<>();
+            if (rows > 0) {
+                result.put("status", "ok");
+                return ResponseEntity.ok(result);
+            } else {
+                result.put("status", "error");
+                result.put("message", "Docente no encontrado");
+                return ResponseEntity.notFound().build();
+            }
+        } catch (Exception e) {
+            e.printStackTrace();
+            Map<String, Object> error = new HashMap<>();
+            error.put("status", "error");
+            error.put("message", "Error al eliminar: " + e.getMessage());
             return ResponseEntity.internalServerError().body(error);
         }
     }

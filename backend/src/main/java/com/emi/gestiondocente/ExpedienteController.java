@@ -1,6 +1,7 @@
 package com.emi.gestiondocente;
 
 import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.beans.factory.annotation.Value;
 import org.springframework.http.ResponseEntity;
 import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.web.bind.annotation.*;
@@ -22,7 +23,8 @@ public class ExpedienteController {
     @Autowired
     private JdbcTemplate jdbcTemplate;
 
-    private static final String EXPEDIENTES_DIR = "C:\\temp\\gestion-docente-web\\expedientes\\";
+    @Value("${sgdc.storage.expedientes}")
+    private String expedientesDir;
 
     // =============================================
     // GET /api/expediente/{id}
@@ -50,9 +52,10 @@ public class ExpedienteController {
             @RequestParam("docente_id") int docenteId,
             @RequestParam(value = "tipo", defaultValue = "otro") String tipo) {
         try {
-            String ext = getExtension(file.getOriginalFilename());
+            String originalName = file.getOriginalFilename() != null ? file.getOriginalFilename() : "documento";
+            String ext = getExtension(originalName);
             String savedName = "exp_" + docenteId + "_" + System.currentTimeMillis() + ext;
-            Path dest = Paths.get(EXPEDIENTES_DIR + savedName);
+            Path dest = Paths.get(expedientesDir + savedName);
             Files.createDirectories(dest.getParent());
             file.transferTo(dest.toFile());
 
@@ -63,13 +66,15 @@ public class ExpedienteController {
                 RETURNING documento_id
                 """,
                 Integer.class,
-                docenteId, tipo, savedName, savedName
+                docenteId, tipo, originalName, savedName
             );
 
             Map<String, Object> result = new HashMap<>();
             result.put("status", "ok");
             result.put("documento_id", newId);
             result.put("filename", savedName);
+            result.put("nombre_original", originalName);
+            result.put("tamano", file.getSize());
             return ResponseEntity.ok(result);
 
         } catch (Exception e) {
@@ -99,7 +104,7 @@ public class ExpedienteController {
                 String path = rows.get(0).get("archivo_path") != null
                     ? rows.get(0).get("archivo_path").toString() : "";
                 if (!path.isEmpty()) {
-                    File f = new File(EXPEDIENTES_DIR + path);
+                    File f = new File(expedientesDir + path);
                     if (f.exists()) f.delete();
                 }
             }

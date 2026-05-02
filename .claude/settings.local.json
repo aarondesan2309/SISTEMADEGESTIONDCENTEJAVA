@@ -1,0 +1,15 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(xargs cat *)",
+      "Bash(grep -r \"//.*TODO\\\\|HACK\\\\|hack\\\\|wait\\\\|TODO\" /c/temp/gestion-docente-web/backend/src/main/resources/static/app.js -n)",
+      "PowerShell(mvn -version 2>&1)",
+      "PowerShell(java -version 2>&1)",
+      "PowerShell($mavenVersion = \"3.9.9\"; $url = \"https://archive.apache.org/dist/maven/maven-3/$mavenVersion/binaries/apache-maven-$mavenVersion-bin.zip\"; $dest = \"C:\\\\tools\\\\maven-$mavenVersion.zip\"; $installDir = \"C:\\\\tools\"; New-Item -ItemType Directory -Force -Path $installDir | Out-Null; Write-Host \"Descargando Maven $mavenVersion...\"; Invoke-WebRequest -Uri $url -OutFile $dest -UseBasicParsing; Write-Host \"Extrayendo...\"; Expand-Archive -Path $dest -DestinationPath $installDir -Force; Write-Host \"Listo en $installDir\\\\apache-maven-$mavenVersion\")",
+      "PowerShell($env:Path = \"C:\\\\tools\\\\apache-maven-3.9.9\\\\bin;\" + $env:Path; Set-Location \"C:\\\\temp\\\\gestion-docente-web\\\\backend\"; mvn spring-boot:run 2>&1)",
+      "Bash(Select-String -Path \"C:\\\\temp\\\\gestion-docente-web\\\\backend\\\\src\\\\main\\\\resources\\\\static\\\\index.html\" -Pattern \"app-shell|sidebar|app-body|app-topbar|toast-container|btn-logout-sidebar|view-dashboard\")",
+      "Bash(Select-Object LineNumber, Line)",
+      "Bash(git checkout *)"
+    ]
+  }
+}

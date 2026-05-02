@@ -1,10 +1,12 @@
 package com.emi.gestiondocente;
 
+import com.emi.gestiondocente.config.JwtUtil;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.http.ResponseEntity;
 import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.web.bind.annotation.*;
 
+import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
@@ -16,6 +18,21 @@ public class AuthController {
 
     @Autowired
     private JdbcTemplate jdbcTemplate;
+
+    @Autowired
+    private JwtUtil jwtUtil;
+
+    @GetMapping("/usuarios-roles")
+    public ResponseEntity<List<Map<String, Object>>> getUsuariosRoles() {
+        try {
+            List<Map<String, Object>> users = jdbcTemplate.queryForList(
+                "SELECT username, role FROM usuario ORDER BY role, username"
+            );
+            return ResponseEntity.ok(users);
+        } catch (Exception e) {
+            return ResponseEntity.ok(new ArrayList<>());
+        }
+    }
 
     @PostMapping("/login")
     public ResponseEntity<Map<String, String>> login(@RequestBody Map<String, String> payload) {
@@ -38,9 +55,11 @@ public class AuthController {
             if (!rows.isEmpty()) {
                 String role = rows.get(0).get("role").toString();
                 System.out.println("Login exitoso para: " + username + " con rol: " + role);
+                String token = jwtUtil.generateToken(username, role);
                 Map<String, String> result = new HashMap<>();
                 result.put("status", "ok");
                 result.put("role", role);
+                result.put("token", token);
                 return ResponseEntity.ok(result);
             } else {
                 System.out.println("Login fallido para: " + username + " (Credenciales invalidas)");

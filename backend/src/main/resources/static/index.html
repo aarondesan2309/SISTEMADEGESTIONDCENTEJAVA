@@ -80,6 +80,9 @@
                 <h3>Escuela Militar de Odontologia (EMO)</h3>
             </div>
         </div>
+        <div style="margin-top:36px;">
+            <button onclick="openAdminSem()" style="background:transparent;border:1.5px solid #94a3b8;color:#64748b;padding:9px 22px;border-radius:8px;cursor:pointer;font-size:0.83rem;font-weight:600;letter-spacing:0.5px;">&#9881; Administrar Escuelas</button>
+        </div>
     </div>
 
     <!-- Login Container -->
@@ -98,11 +101,139 @@
                     <label>Contrasena</label>
                     <input type="password" id="login-pass" placeholder="Contrasena">
                 </div>
+                <!-- Acceso rápido por rol (para pruebas) -->
+                <div id="quick-roles-panel" style="margin-bottom:14px;">
+                    <p style="font-size:0.72rem;color:#94a3b8;margin-bottom:6px;text-align:left;font-weight:700;text-transform:uppercase;letter-spacing:0.5px;">Acceso rápido — Usuarios del sistema</p>
+                    <div id="quick-roles-list" style="display:flex;flex-wrap:wrap;gap:5px;min-height:24px;">
+                        <span style="font-size:0.78rem;color:#94a3b8;">Cargando...</span>
+                    </div>
+                    <p style="font-size:0.7rem;color:#94a3b8;margin-top:5px;">Click rellena usuario y contraseña automáticamente.</p>
+                </div>
                 <div class="form-group" style="margin-top:8px;">
                     <label style="color:#888;font-size:0.78rem;">Plataforma Segura</label>
                 </div>
                 <button type="submit">INGRESAR AL SISTEMA</button>
             </form>
+        </div>
+    </div>
+
+    <!-- Admin SEM Container -->
+    <div id="admin-sem-container" class="login-wrapper auth-hidden fade-in" style="align-items:flex-start;overflow-y:auto;padding:0;">
+        <button class="btn-back-landing" onclick="backFromAdminSem()" style="z-index:10;">&#8592; Regresar al Hub SEM</button>
+
+        <!-- Login card SEM admin -->
+        <div id="admin-sem-login-card" class="login-card" style="margin:auto;">
+            <div style="width:56px;height:56px;background:var(--color-maroon);border-radius:50%;display:flex;align-items:center;justify-content:center;margin:0 auto 16px;font-size:1.4rem;">&#9881;</div>
+            <h2>ADMINISTRACIÓN S.E.M.</h2>
+            <h4 style="font-size:0.85rem;color:#666;margin-bottom:22px;">Acceso restringido &mdash; Rol: SEM</h4>
+            <form id="admin-sem-form">
+                <div class="form-group">
+                    <label>Usuario</label>
+                    <input type="text" id="admin-sem-user" placeholder="Usuario administrador SEM">
+                </div>
+                <div class="form-group">
+                    <label>Contraseña</label>
+                    <input type="password" id="admin-sem-pass" placeholder="Contraseña">
+                </div>
+                <!-- Usuarios SEM rápidos -->
+                <div style="margin-bottom:14px;">
+                    <p style="font-size:0.72rem;color:#94a3b8;margin-bottom:6px;text-align:left;font-weight:700;text-transform:uppercase;letter-spacing:0.5px;">Usuarios con rol SEM</p>
+                    <div id="sem-quick-list" style="display:flex;flex-wrap:wrap;gap:5px;min-height:22px;">
+                        <span style="font-size:0.78rem;color:#94a3b8;">—</span>
+                    </div>
+                    <p style="font-size:0.7rem;color:#94a3b8;margin-top:5px;">Click rellena usuario y contraseña automáticamente.</p>
+                </div>
+                <div id="admin-sem-error" style="color:#dc2626;font-size:0.85rem;margin-bottom:12px;display:none;"></div>
+                <button type="submit">INGRESAR</button>
+            </form>
+        </div>
+
+        <!-- Panel de gestión (visible tras login SEM) -->
+        <div id="admin-sem-panel" class="auth-hidden" style="width:100%;padding:40px 32px;box-sizing:border-box;">
+            <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:28px;">
+                <div>
+                    <h2 style="color:white;font-size:1.25rem;font-weight:900;letter-spacing:1px;">GESTIÓN DE PLANTELES — S.E.M.</h2>
+                    <p style="color:rgba(255,255,255,0.6);font-size:0.85rem;margin-top:4px;">Configuración y alta de nuevas escuelas en el sistema</p>
+                </div>
+                <div style="display:flex;align-items:center;gap:12px;">
+                    <span id="admin-sem-logged-user" style="color:rgba(255,255,255,0.75);font-size:0.85rem;font-weight:600;"></span>
+                    <button onclick="logoutAdminSem()" style="background:rgba(255,255,255,0.1);border:1px solid rgba(255,255,255,0.3);color:white;padding:7px 16px;border-radius:7px;cursor:pointer;font-size:0.85rem;">Cerrar Sesión</button>
+                </div>
+            </div>
+
+            <!-- Planteles existentes -->
+            <div style="background:rgba(255,255,255,0.08);border:1px solid rgba(255,255,255,0.12);border-radius:14px;padding:20px;margin-bottom:24px;">
+                <h3 style="color:rgba(255,255,255,0.9);font-size:0.9rem;text-transform:uppercase;letter-spacing:1px;margin-bottom:14px;">Planteles Registrados</h3>
+                <div id="admin-escuelas-lista" style="display:flex;flex-wrap:wrap;gap:10px;">
+                    <span style="color:rgba(255,255,255,0.5);font-size:0.9rem;">Cargando...</span>
+                </div>
+            </div>
+
+            <!-- Formulario nuevo plantel -->
+            <div style="background:white;border-radius:14px;overflow:hidden;">
+                <div style="background:var(--color-maroon);padding:16px 24px;display:flex;justify-content:space-between;align-items:center;">
+                    <h3 style="color:white;font-size:0.95rem;margin:0;font-weight:800;text-transform:uppercase;">Configurar Nuevo Plantel</h3>
+                    <button onclick="toggleFormNuevoPlantel()" id="btn-toggle-form-plantel" style="background:rgba(255,255,255,0.15);border:1px solid rgba(255,255,255,0.3);color:white;padding:5px 14px;border-radius:6px;cursor:pointer;font-size:0.82rem;">+ Expandir</button>
+                </div>
+                <div id="form-nuevo-plantel" style="padding:24px;display:none;">
+                    <div style="display:grid;grid-template-columns:1fr 1fr;gap:16px;">
+                        <div>
+                            <label class="lbl-field">SIGLAS *</label>
+                            <input type="text" id="np-siglas" placeholder="Ej: EMI" oninput="this.value=this.value.toUpperCase()" style="width:100%;padding:10px 12px;border:1.5px solid #e2e8f0;border-radius:8px;font-size:0.92rem;box-sizing:border-box;">
+                        </div>
+                        <div>
+                            <label class="lbl-field">CICLO ESCOLAR *</label>
+                            <input type="text" id="np-ciclo" placeholder="Ej: MAR-AGO 2026" style="width:100%;padding:10px 12px;border:1.5px solid #e2e8f0;border-radius:8px;font-size:0.92rem;box-sizing:border-box;">
+                        </div>
+                        <div style="grid-column:1/-1;">
+                            <label class="lbl-field">NOMBRE COMPLETO *</label>
+                            <input type="text" id="np-nombre" placeholder="Ej: Escuela Militar de Ingeniería" style="width:100%;padding:10px 12px;border:1.5px solid #e2e8f0;border-radius:8px;font-size:0.92rem;box-sizing:border-box;">
+                        </div>
+                        <div style="grid-column:1/-1;">
+                            <label class="lbl-field">DIRECTOR</label>
+                            <input type="text" id="np-director" placeholder="Nombre del director" style="width:100%;padding:10px 12px;border:1.5px solid #e2e8f0;border-radius:8px;font-size:0.92rem;box-sizing:border-box;">
+                        </div>
+                    </div>
+
+                    <div style="margin-top:18px;">
+                        <label class="lbl-field">CARRERAS</label>
+                        <div style="display:flex;flex-wrap:wrap;gap:10px;margin-top:8px;" id="np-carreras-checks">
+                            <label style="display:flex;align-items:center;gap:5px;font-size:0.88rem;cursor:pointer;"><input type="checkbox" value="ICI"> ICI - Ing. Computación</label>
+                            <label style="display:flex;align-items:center;gap:5px;font-size:0.88rem;cursor:pointer;"><input type="checkbox" value="ICE"> ICE - Ing. Comunicaciones</label>
+                            <label style="display:flex;align-items:center;gap:5px;font-size:0.88rem;cursor:pointer;"><input type="checkbox" value="II"> II - Ing. Industrial</label>
+                            <label style="display:flex;align-items:center;gap:5px;font-size:0.88rem;cursor:pointer;"><input type="checkbox" value="IC"> IC - Ing. Construcción</label>
+                            <label style="display:flex;align-items:center;gap:5px;font-size:0.88rem;cursor:pointer;"><input type="checkbox" value="TC"> TC - Tronco Común</label>
+                            <label style="display:flex;align-items:center;gap:5px;font-size:0.88rem;cursor:pointer;"><input type="checkbox" value="MED"> MED - Medicina</label>
+                            <label style="display:flex;align-items:center;gap:5px;font-size:0.88rem;cursor:pointer;"><input type="checkbox" value="ODO"> ODO - Odontología</label>
+                            <label style="display:flex;align-items:center;gap:5px;font-size:0.88rem;cursor:pointer;"><input type="checkbox" value="ENF"> ENF - Enfermería</label>
+                        </div>
+                    </div>
+
+                    <div style="margin-top:18px;">
+                        <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:10px;">
+                            <label class="lbl-field" style="margin:0;">USUARIOS INICIALES</label>
+                            <button type="button" onclick="npAgregarUsuario()" style="background:transparent;color:var(--color-maroon);border:1.5px solid var(--color-maroon);padding:4px 12px;border-radius:6px;cursor:pointer;font-size:0.82rem;font-weight:700;">+ Agregar</button>
+                        </div>
+                        <div id="np-usuarios-rows"></div>
+                    </div>
+
+                    <details style="margin-top:18px;">
+                        <summary style="cursor:pointer;color:#64748b;font-size:0.85rem;font-weight:600;user-select:none;">&#9881; Base de datos (avanzado)</summary>
+                        <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px;margin-top:12px;padding:14px;background:#f8fafc;border-radius:9px;">
+                            <div><label class="lbl-field" style="font-size:0.78rem;">HOST</label><input type="text" id="np-dbhost" value="localhost" style="width:100%;padding:8px 10px;border:1.5px solid #e2e8f0;border-radius:7px;font-size:0.88rem;box-sizing:border-box;"></div>
+                            <div><label class="lbl-field" style="font-size:0.78rem;">PUERTO</label><input type="text" id="np-dbport" value="5432" style="width:100%;padding:8px 10px;border:1.5px solid #e2e8f0;border-radius:7px;font-size:0.88rem;box-sizing:border-box;"></div>
+                            <div><label class="lbl-field" style="font-size:0.78rem;">NOMBRE BD</label><input type="text" id="np-dbname" placeholder="gestion_docente_emi" style="width:100%;padding:8px 10px;border:1.5px solid #e2e8f0;border-radius:7px;font-size:0.88rem;box-sizing:border-box;"></div>
+                            <div><label class="lbl-field" style="font-size:0.78rem;">USUARIO BD</label><input type="text" id="np-dbuser" value="postgres" style="width:100%;padding:8px 10px;border:1.5px solid #e2e8f0;border-radius:7px;font-size:0.88rem;box-sizing:border-box;"></div>
+                            <div style="grid-column:1/-1;"><label class="lbl-field" style="font-size:0.78rem;">CONTRASEÑA BD</label><input type="password" id="np-dbpass" placeholder="Dejar vacío para usar la configurada" style="width:100%;padding:8px 10px;border:1.5px solid #e2e8f0;border-radius:7px;font-size:0.88rem;box-sizing:border-box;"></div>
+                        </div>
+                    </details>
+
+                    <div style="margin-top:22px;display:flex;gap:12px;">
+                        <button class="btn-action" style="flex:2;" onclick="npGuardarPlantel()">&#10003; GUARDAR PLANTEL</button>
+                    </div>
+                    <div id="np-result-msg" style="margin-top:12px;"></div>
+                </div>
+            </div>
         </div>
     </div>
 
@@ -750,6 +881,6 @@
         <button id="btn-logout" class="btn-logout-floating">Cerrar Sesion</button>
     </div>
 
-    <script src="app.js?v=2026.6"></script>
+    <script src="app.js?v=2026.12"></script>
 </body>
 </html>

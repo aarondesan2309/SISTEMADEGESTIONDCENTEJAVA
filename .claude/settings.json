@@ -1,0 +1,26 @@
+{
+  "permissions": {
+    "allow": [
+      "PowerShell($env:PGPASSWORD=\"1234\"; & 'C:\\\\Program Files\\\\PostgreSQL\\\\16\\\\bin\\\\psql.exe' -U postgres -d gestion_docente_emi -t -c \"SELECT username, role FROM usuario ORDER BY role;\")",
+      "PowerShell($env:PGPASSWORD=\"1234\"; & 'C:\\\\Program Files\\\\PostgreSQL\\\\16\\\\bin\\\\psql.exe' -U postgres -d gestion_docente_emi -t -c \"SELECT username, role, \\(password_hash = crypt\\(username, password_hash\\)\\) as pass_eq_user FROM usuario ORDER BY role;\")",
+      "PowerShell($env:PGPASSWORD=\"1234\"; & 'C:\\\\Program Files\\\\PostgreSQL\\\\16\\\\bin\\\\psql.exe' -U postgres -d gestion_docente_emi -t -c \"SELECT username, role, \\(password_hash = crypt\\('1234', password_hash\\)\\) as pass_1234, \\(password_hash = crypt\\('emi2024', password_hash\\)\\) as pass_emi2024, \\(password_hash = crypt\\('emi2025', password_hash\\)\\) as pass_emi2025, \\(password_hash = crypt\\('Emi2024', password_hash\\)\\) as pass_Emi2024 FROM usuario ORDER BY role;\")",
+      "PowerShell($env:PGPASSWORD=\"1234\"; & 'C:\\\\Program Files\\\\PostgreSQL\\\\16\\\\bin\\\\psql.exe' -U postgres -d gestion_docente_emi -t -c \"SELECT username, role, \\(password_hash = crypt\\(lower\\(role\\), password_hash\\)\\) as pass_role_lower, \\(password_hash = crypt\\('password', password_hash\\)\\) as pass_password, \\(password_hash = crypt\\('123456', password_hash\\)\\) as pass_123456, \\(password_hash = crypt\\('sgdc2024', password_hash\\)\\) as pass_sgdc FROM usuario ORDER BY role;\")",
+      "PowerShell(Get-Process java -ErrorAction SilentlyContinue | Where-Object {$_.MainWindowTitle -eq \"\" } | Select-Object Id, CPU, StartTime)",
+      "PowerShell(netstat -ano)",
+      "PowerShell(Stop-Process -Id 4644 -Force)",
+      "PowerShell($env:Path = \"C:\\\\tools\\\\apache-maven-3.9.9\\\\bin;\" + $env:Path; Set-Location \"C:\\\\temp\\\\gestion-docente-web\\\\backend\"; mvn spring-boot:run 2>&1)",
+      "PowerShell($env:PGPASSWORD=\"1234\"; & 'C:\\\\Program Files\\\\PostgreSQL\\\\16\\\\bin\\\\psql.exe' -U postgres -d gestion_docente_emi -t -c \"SELECT username, role, \\(password_hash = crypt\\(username, password_hash\\)\\) as pass_ok FROM usuario ORDER BY role;\")",
+      "PowerShell($env:PGPASSWORD=\"1234\"; & 'C:\\\\Program Files\\\\PostgreSQL\\\\16\\\\bin\\\\psql.exe' -U postgres -d gestion_docente_emi -t -c \"SELECT DISTINCT condicion FROM docente ORDER BY condicion;\")",
+      "PowerShell(head -1)",
+      "PowerShell($pid8091 = \\(netstat -ano | findstr \":8091 \"\\)[0] -split '\\\\s+' | Select-Object -Last 1; Stop-Process -Id $pid8091 -Force -ErrorAction SilentlyContinue; Write-Host \"Detenido PID $pid8091\")",
+      "Bash(/c/tools/apache-maven-3.9.9/bin/mvn spring-boot:run -q)",
+      "Bash(echo \"PID=$!\")",
+      "Read(//tmp/**)",
+      "Bash(curl -s http://localhost:8091/api/docentes)",
+      "Bash(curl -s http://localhost:8091/)",
+      "PowerShell(Stop-Process -Id 18052 -Force)",
+      "Bash(mvn compile *)",
+      "Bash(./mvnw compile *)"
+    ]
+  }
+}

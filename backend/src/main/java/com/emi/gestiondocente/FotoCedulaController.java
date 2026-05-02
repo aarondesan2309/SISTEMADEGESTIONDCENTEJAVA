@@ -1,12 +1,12 @@
 package com.emi.gestiondocente;
 
 import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.beans.factory.annotation.Value;
 import org.springframework.http.ResponseEntity;
 import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.web.bind.annotation.*;
 import org.springframework.web.multipart.MultipartFile;
 
-import java.io.File;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.nio.file.Paths;
@@ -21,8 +21,11 @@ public class FotoCedulaController {
     @Autowired
     private JdbcTemplate jdbcTemplate;
 
-    private static final String FOTOS_DIR   = "C:\\temp\\gestion-docente-web\\fotos\\";
-    private static final String CEDULAS_DIR = "C:\\temp\\gestion-docente-web\\cedulas\\";
+    @Value("${sgdc.storage.fotos}")
+    private String fotosDir;
+
+    @Value("${sgdc.storage.cedulas}")
+    private String cedulasDir;
 
     // =============================================
     // POST /api/fotos
@@ -34,7 +37,7 @@ public class FotoCedulaController {
         try {
             String ext = getExtension(file.getOriginalFilename());
             String savedName = "foto_" + docenteId + ext;
-            Path dest = Paths.get(FOTOS_DIR + savedName);
+            Path dest = Paths.get(fotosDir + savedName);
             Files.createDirectories(dest.getParent());
             file.transferTo(dest.toFile());
 
@@ -67,7 +70,7 @@ public class FotoCedulaController {
         try {
             String ext = getExtension(file.getOriginalFilename());
             String savedName = "cedula_" + docenteId + ext;
-            Path dest = Paths.get(CEDULAS_DIR + savedName);
+            Path dest = Paths.get(cedulasDir + savedName);
             Files.createDirectories(dest.getParent());
             file.transferTo(dest.toFile());
 

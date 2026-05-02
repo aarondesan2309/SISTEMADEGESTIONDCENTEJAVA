@@ -26,6 +26,10 @@ public class MateriaController {
                    m.nombre as materia,
                    COALESCE(c.siglas, 'N/A') as carrera,
                    MAX(COALESCE(a.horas, 0)) as horas,
+                   MAX(COALESCE(a.horas_m1, 0)) as horas_m1,
+                   MAX(COALESCE(a.horas_m2, 0)) as horas_m2,
+                   MAX(COALESCE(a.horas_m3, 0)) as horas_m3,
+                   MAX(COALESCE(a.horas_m4, 0)) as horas_m4,
                    MAX(a.nivel_pago) as nivel_pago,
                    MAX(d.grado_acad) as grado,
                    EXISTS(SELECT 1 FROM contrato_emitido ce WHERE ce.docente_id = a.docente_id AND ce.materia_id = m.materia_id) as ya_emitido

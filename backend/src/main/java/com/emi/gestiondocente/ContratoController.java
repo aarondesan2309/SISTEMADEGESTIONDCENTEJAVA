@@ -1,6 +1,7 @@
 package com.emi.gestiondocente;
 
 import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.beans.factory.annotation.Value;
 import org.springframework.http.HttpHeaders;
 import org.springframework.http.MediaType;
 import org.springframework.http.ResponseEntity;
@@ -13,6 +14,7 @@ import java.math.RoundingMode;
 import java.nio.charset.StandardCharsets;
 import java.text.NumberFormat;
 import java.util.*;
+import java.util.regex.*;
 import java.util.zip.*;
 
 @RestController
@@ -23,14 +25,8 @@ public class ContratoController {
     @Autowired
     private JdbcTemplate jdbcTemplate;
 
-    // ✅ FIX 1: Ruta de plantilla configurable via variable de entorno o propiedad.
-    // Agrega en application.properties:
-    // contrato.template.path=C:/temp/gestion-docente-web/MAR-AGO26 (2).docx
-    // O define la variable de entorno CONTRATO_TEMPLATE_PATH antes de iniciar la
-    // app.
-    private static final String TEMPLATE_PATH = System.getenv("CONTRATO_TEMPLATE_PATH") != null
-            ? System.getenv("CONTRATO_TEMPLATE_PATH")
-            : "C:\\temp\\gestion-docente-web\\MAR-AGO26 (2).docx";
+    @Value("${sgdc.storage.contrato-template}")
+    private String templatePath;
 
     @GetMapping("/contratos")
     public ResponseEntity<List<Map<String, Object>>> getContratos() {
@@ -146,16 +142,6 @@ public class ContratoController {
                                 "Ya se ha generado un contrato para esta materia anteriormente."));
             }
 
-            // Validar regla de las 80 horas
-            BigDecimal totalHoras = jdbcTemplate.queryForObject(
-                    "SELECT COALESCE(SUM(horas), 0) FROM asignacion WHERE docente_id = ?",
-                    BigDecimal.class, docId);
-
-            if (totalHoras != null && totalHoras.compareTo(new BigDecimal("80")) > 0) {
-                Map<String, String> err = new HashMap<>();
-                err.put("message", "Exceso de horas (" + totalHoras + "). El máximo es 80.");
-                return ResponseEntity.badRequest().body(err);
-            }
 
             // Validar que la materia está asignada al docente y tiene horas
             BigDecimal horasMateria = jdbcTemplate.queryForObject(
@@ -170,12 +156,12 @@ public class ContratoController {
 
             // ✅ FIX 5: Verificar que la plantilla .docx existe en disco antes de intentar
             // leerla.
-            File templateFile = new File(TEMPLATE_PATH);
+            File templateFile = new File(templatePath);
             if (!templateFile.exists() || !templateFile.isFile()) {
                 return ResponseEntity.internalServerError()
                         .body(Collections.singletonMap("message",
-                                "No se encontró la plantilla Word en: " + TEMPLATE_PATH +
-                                        ". Verifica que el archivo exista o configura la variable CONTRATO_TEMPLATE_PATH."));
+                                "No se encontró la plantilla Word en: " + templatePath +
+                                        ". Verifica la propiedad sgdc.storage.contrato-template en application.properties."));
             }
 
             Integer newId = jdbcTemplate.queryForObject(
@@ -203,15 +189,17 @@ public class ContratoController {
                             "WHERE d.docente_id = ? GROUP BY d.docente_id",
                     docId);
 
-            // Filtrar SOLO por la materia seleccionada
+            // Filtrar SOLO por la materia seleccionada — LIMIT 1 evita duplicados si hay
+            // múltiples filas de asignacion para el mismo (docente, materia)
             List<Map<String, Object>> materias = jdbcTemplate.queryForList(
-                    "SELECT m.nombre as materia, a.horas, a.nivel_pago " +
+                    "SELECT m.nombre as materia, a.horas, a.horas_m1, a.horas_m2, a.horas_m3, a.horas_m4, a.nivel_pago " +
                             "FROM asignacion a JOIN materia m ON a.materia_id = m.materia_id " +
-                            "WHERE a.docente_id = ? AND m.materia_id = ? AND a.horas > 0",
+                            "WHERE a.docente_id = ? AND m.materia_id = ? AND a.horas > 0 " +
+                            "ORDER BY a.horas DESC LIMIT 1",
                     docId, materiaId);
 
             Map<String, String> replacements = buildReplacements(docente, materias, folio);
-            byte[] docxBytes = modifyZip(TEMPLATE_PATH, replacements);
+            byte[] docxBytes = modifyZip(templatePath, replacements);
 
             // ✅ FIX 7: Nombre de archivo seguro — elimina caracteres problemáticos
             // incluyendo acentos y ñ.
@@ -311,26 +299,29 @@ public class ContratoController {
     // → w:t → end y reemplaza TODOS los <w:t> en la zona "display" (entre separate
     // y end).
     private String replaceMergeField(String xml, String fieldName, String value) {
-        String searchKey = "MERGEFIELD " + fieldName;
+        Pattern fieldPattern = Pattern.compile("MERGEFIELD\\s+" + Pattern.quote(fieldName) + "(?![a-zA-Z0-9_])");
         String valEscaped = escapeXml(value);
         int searchFrom = 0;
+        int replacements = 0;
 
         while (true) {
-            // 1. Localizar la instrucción del campo
-            int instrPos = xml.indexOf(searchKey, searchFrom);
-            if (instrPos == -1) break;
+            Matcher m = fieldPattern.matcher(xml);
+            if (!m.find(searchFrom)) break;
+            int instrPos = m.start();
 
-            // 2. Localizar el inicio del campo (fldChar begin)
             int beginIdx = xml.lastIndexOf("<w:fldChar w:fldCharType=\"begin\"", instrPos);
-            // 3. Localizar el fin del campo (fldChar end)
             int endIdx = xml.indexOf("w:fldCharType=\"end\"", instrPos);
 
+            if ("NOMBRE".equals(fieldName)) {
+                System.out.println("[DEBUG NOMBRE] instrPos=" + instrPos + " beginIdx=" + beginIdx + " endIdx=" + endIdx);
+            }
+
             if (beginIdx == -1 || endIdx == -1 || beginIdx > endIdx) {
+                if ("NOMBRE".equals(fieldName)) System.out.println("[DEBUG NOMBRE] SKIP: invalid bounds");
                 searchFrom = instrPos + 1;
                 continue;
             }
 
-            // 4. Encontrar el cierre de la etiqueta fldChar del end (el ">" final)
             int endClose = xml.indexOf(">", endIdx);
             if (endClose == -1) {
                 searchFrom = instrPos + 1;
@@ -338,15 +329,18 @@ public class ContratoController {
             }
             int realEnd = endClose + 1;
 
-            // 5. REEMPLAZO RADICAL: Sustituir todo el bloque del campo por una etiqueta de texto básica.
-            // Al dejarlo dentro de los posibles tags <w:r> existentes, mantenemos el XML válido.
-            xml = xml.substring(0, beginIdx) + 
-                  "<w:t xml:space=\"preserve\">" + valEscaped + "</w:t>" + 
+            if ("NOMBRE".equals(fieldName)) {
+                System.out.println("[DEBUG NOMBRE] replacing [" + beginIdx + ".." + realEnd + "] with value=" + value);
+            }
+
+            xml = xml.substring(0, beginIdx) +
+                  "<w:t xml:space=\"preserve\">" + valEscaped + "</w:t>" +
                   xml.substring(realEnd);
-            
-            // Avanzar el puntero de búsqueda
+
+            replacements++;
             searchFrom = beginIdx + valEscaped.length();
         }
+        if ("NOMBRE".equals(fieldName)) System.out.println("[DEBUG NOMBRE] total replacements=" + replacements);
         return xml;
     }
 
@@ -404,7 +398,7 @@ public class ContratoController {
         // --- Concordancias de género para el cuerpo del contrato ---
         r.put("ellael", f ? "ella" : "el");
         r.put("SEXO", f ? "La" : "El");
-        r.put("PRESTADOR1", f ? "a" : "o");
+        r.put("PRESTADOR1", f ? "a" : "");
         r.put("AuO", f ? "a" : "");
         r.put("DEL_DELA", f ? "de la" : "del");
         r.put("Una_Un_prestador", f ? "una" : "un");
@@ -420,11 +414,12 @@ public class ContratoController {
             for (String c : carreras) {
                 String cc = c.trim();
                 String nombre = switch (cc) {
-                    case "ICI" -> "Ingeniero en Computación e Informática";
-                    case "IC" -> "Ingeniero Constructor Militar";
-                    case "ICE" -> "Ingeniero en Comunicaciones y Electrónica";
-                    case "II" -> "Ingeniero Industrial";
-                    default -> cc;
+                    case "ICI"    -> "Ingeniero en Computación e Informática";
+                    case "IC"     -> "Ingeniero Constructor Militar";
+                    case "ICE"    -> "Ingeniero en Comunicaciones y Electrónica";
+                    case "II"     -> "Ingeniero Industrial";
+                    case "TC"     -> "Tronco Común";
+                    default       -> cc;
                 };
 
                 if (carreraFinal.length() > 0)
@@ -437,6 +432,7 @@ public class ContratoController {
         // --- Materias y horas ---
         StringBuilder msb = new StringBuilder();
         BigDecimal th = BigDecimal.ZERO;
+        BigDecimal[] hMeses = {BigDecimal.ZERO, BigDecimal.ZERO, BigDecimal.ZERO, BigDecimal.ZERO};
         String nivel = "Licenciatura"; // nivel por defecto
 
         for (Map<String, Object> m : materias) {
@@ -445,12 +441,14 @@ public class ContratoController {
             msb.append(val(m, "materia"));
 
             Object horasObj = m.get("horas");
-            if (horasObj != null) {
-                BigDecimal h = new BigDecimal(horasObj.toString());
-                th = th.add(h);
-            }
+            if (horasObj != null) th = th.add(new BigDecimal(horasObj.toString()));
+            
+            if (m.get("horas_m1") != null) hMeses[0] = hMeses[0].add(new BigDecimal(m.get("horas_m1").toString()));
+            if (m.get("horas_m2") != null) hMeses[1] = hMeses[1].add(new BigDecimal(m.get("horas_m2").toString()));
+            if (m.get("horas_m3") != null) hMeses[2] = hMeses[2].add(new BigDecimal(m.get("horas_m3").toString()));
+            if (m.get("horas_m4") != null) hMeses[3] = hMeses[3].add(new BigDecimal(m.get("horas_m4").toString()));
+
             // El último nivel_pago en la iteración define el tabulador general.
-            // Si hay materias mixtas, predominará el último nivel.
             if (m.get("nivel_pago") != null && !m.get("nivel_pago").toString().isEmpty()) {
                 nivel = m.get("nivel_pago").toString();
             }
@@ -458,91 +456,80 @@ public class ContratoController {
 
         r.put("UNIDAD_DE_APENDIZAJE", msb.toString());
         r.put("NIVEL_IMPARTIR", nivel);
-        r.put("HORAS", th.stripTrailingZeros().toPlainString());
-        r.put("T_HS", th.stripTrailingZeros().toPlainString());
-        r.put("HsMes1", th.stripTrailingZeros().toPlainString());
-        r.put("HsMes2", th.stripTrailingZeros().toPlainString());
 
         // --- Tabuladores UDEFA ---
         BigDecimal thora;
         switch (nivel.toLowerCase()) {
+            case "doctorado": thora = new BigDecimal("1048.95"); break;
             case "maestría":
-            case "maestria":
-                thora = new BigDecimal("734.27");
-                break;
+            case "maestria":  thora = new BigDecimal("734.27"); break;
             case "técnico":
-            case "tecnico":
-                thora = new BigDecimal("199.30");
-                break;
-            default: // Licenciatura
-                thora = new BigDecimal("419.58");
-                break;
+            case "tecnico":   thora = new BigDecimal("199.30"); break;
+            default:          thora = new BigDecimal("419.58"); break;
         }
-        r.put("POR_HORA", "$" + nf.format(thora));
+        r.put("POR_HORA", nf.format(thora));
         r.put("IMP_HS", "$" + nf.format(thora));
+        r.put("LETRA_HORA", amountToWords(thora));
 
-        // --- Cálculos fiscales (Basados en 4 meses de contrato) ---
-        BigDecimal divisorMeses = new BigDecimal("4");
-        BigDecimal thMes = th.divide(divisorMeses, 2, RoundingMode.HALF_UP);
-        
-        BigDecimal brutoMensual = thMes.multiply(thora).setScale(2, RoundingMode.HALF_UP);
-        BigDecimal ivaMensual = BigDecimal.ZERO;
-        BigDecimal rivaMensual = BigDecimal.ZERO;
-        BigDecimal risrMensual;
-
-        boolean esServiciosProfesionales = !"RS".equalsIgnoreCase(reg) && !"RESICO".equalsIgnoreCase(reg);
-
-        if (esServiciosProfesionales) {
-            ivaMensual = brutoMensual.multiply(new BigDecimal("0.16")).setScale(2, RoundingMode.HALF_UP);
-            rivaMensual = brutoMensual.multiply(new BigDecimal("0.106667")).setScale(2, RoundingMode.HALF_UP);
-        }
-        
+        // --- Cálculos fiscales ---
+        boolean aplicaIvaRiva = !"RS".equalsIgnoreCase(reg);
+        BigDecimal tasaIva = new BigDecimal("0.16");
+        BigDecimal tasaRiva = new BigDecimal("0.106667");
         BigDecimal tasaIsr = "RESICO".equalsIgnoreCase(reg) ? new BigDecimal("0.0125") : new BigDecimal("0.10");
-        risrMensual = brutoMensual.multiply(tasaIsr).setScale(2, RoundingMode.HALF_UP);
 
-        BigDecimal netoMensual = brutoMensual.add(ivaMensual).subtract(rivaMensual).subtract(risrMensual);
+        BigDecimal brutoTotal = BigDecimal.ZERO;
+        BigDecimal ivaTotal = BigDecimal.ZERO;
+        BigDecimal risrTotal = BigDecimal.ZERO;
+        BigDecimal rivaTotal = BigDecimal.ZERO;
+        BigDecimal netoTotal = BigDecimal.ZERO;
+        BigDecimal subtotalTotal = BigDecimal.ZERO;
 
-        // Campos por mes
-        for (int i = 1; i <= 4; i++) {
-            r.put("HsMes" + i, thMes.stripTrailingZeros().toPlainString());
-            r.put("SubtalMes" + i, "$" + nf.format(brutoMensual));
-            r.put("IvaMes" + i, "$" + nf.format(ivaMensual));
-            r.put("RetISRMes" + i, "$" + nf.format(risrMensual));
-            r.put("RetIVAMes" + i, "$" + nf.format(rivaMensual));
-            r.put("NetoMes" + i, "$" + nf.format(netoMensual));
-            r.put("ImpBruto_Mes" + i, "$" + nf.format(brutoMensual));
+        for (int i = 0; i < 4; i++) {
+            BigDecimal hm = hMeses[i];
+            int ms = i + 1;
+            
+            BigDecimal brutoM = hm.multiply(thora).setScale(2, RoundingMode.HALF_UP);
+            BigDecimal ivaM = aplicaIvaRiva ? brutoM.multiply(tasaIva).setScale(2, RoundingMode.HALF_UP) : BigDecimal.ZERO;
+            BigDecimal rivaM = aplicaIvaRiva ? brutoM.multiply(tasaRiva).setScale(2, RoundingMode.HALF_UP) : BigDecimal.ZERO;
+            BigDecimal risrM = brutoM.multiply(tasaIsr).setScale(2, RoundingMode.HALF_UP);
+            BigDecimal netoM = brutoM.add(ivaM).subtract(rivaM).subtract(risrM);
+            BigDecimal subtotalM = brutoM.add(ivaM);
+
+            r.put("HsMes" + ms, hm.stripTrailingZeros().toPlainString());
+            r.put("ImpBruto_Mes" + ms, "$" + nf.format(brutoM));
+            r.put("IvaMes" + ms, "$" + nf.format(ivaM));
+            r.put("SubtalMes" + ms, "$" + nf.format(subtotalM));
+            r.put("RetISRMes" + ms, "$" + nf.format(risrM));
+            r.put("RetIVAMes" + ms, "$" + nf.format(rivaM));
+            r.put("NetoMes" + ms, "$" + nf.format(netoM));
+
+            brutoTotal = brutoTotal.add(brutoM);
+            ivaTotal = ivaTotal.add(ivaM);
+            risrTotal = risrTotal.add(risrM);
+            rivaTotal = rivaTotal.add(rivaM);
+            netoTotal = netoTotal.add(netoM);
+            subtotalTotal = subtotalTotal.add(subtotalM);
         }
-
-        // Totales 4 meses (Sumatoria)
-        BigDecimal brutoTotal = brutoMensual.multiply(divisorMeses);
-        BigDecimal ivaTotal = ivaMensual.multiply(divisorMeses);
-        BigDecimal risrTotal = risrMensual.multiply(divisorMeses);
-        BigDecimal rivaTotal = rivaMensual.multiply(divisorMeses);
-        BigDecimal netoTotal = netoMensual.multiply(divisorMeses);
 
         r.put("T_HS", th.stripTrailingZeros().toPlainString());
+        r.put("HORAS", th.stripTrailingZeros().toPlainString());
+        r.put("T_IB", "$" + nf.format(brutoTotal));
         r.put("T_SUB", "$" + nf.format(brutoTotal));
         r.put("T_IVA", "$" + nf.format(ivaTotal));
+        r.put("T_SbT", "$" + nf.format(subtotalTotal));
         r.put("T_RISR", "$" + nf.format(risrTotal));
-        r.put("T_RIVA", "$" + nf.format(rivaTotal));
-        r.put("T_NET", "$" + nf.format(netoTotal));
-
-        // Otros alias comunes
-        r.put("HORAS", th.stripTrailingZeros().toPlainString());
-        r.put("T_HS", th.stripTrailingZeros().toPlainString());
-        r.put("IMP_BRUTO", "$" + nf.format(brutoTotal));
-        r.put("IMP_NETO", "$" + nf.format(netoTotal));
-        r.put("TOTAL_RECIBIR", "$" + nf.format(netoTotal));
-        r.put("T_SbT", "$" + nf.format(brutoTotal));
-        r.put("T_IVA", "$" + nf.format(ivaTotal));
         r.put("T_ISR", "$" + nf.format(risrTotal));
         r.put("T_RIVA", "$" + nf.format(rivaTotal));
+        r.put("T_IVA1", "$" + nf.format(rivaTotal));
         r.put("T_NET", "$" + nf.format(netoTotal));
         r.put("T_IN", "$" + nf.format(netoTotal));
 
-        // ✅ FIX 14: LETRA con formato legible (ej. "$ 15,234.56 M.N.") en vez del
-        // toPlainString crudo.
-        r.put("LETRA", "$ " + nf.format(netoTotal) + " M.N.");
+        // Otros alias comunes
+        r.put("HORAS", th.stripTrailingZeros().toPlainString());
+        r.put("IMP_BRUTO", "$" + nf.format(brutoTotal));
+        r.put("IMP_NETO", "$" + nf.format(netoTotal));
+        r.put("TOTAL_RECIBIR", nf.format(netoTotal));  // template tiene "$" literal antes del campo
+        r.put("LETRA", amountToWords(netoTotal));       // monto en palabras
 
         // --- Datos del periodo contractual ---
         r.put("PERIODO", "Marzo - Junio 2026");
@@ -556,11 +543,60 @@ public class ContratoController {
         return r;
     }
 
-    // ✅ FIX 16: val() acepta tanto Map<String,Object> como cualquier Map para
-    // evitar
-    // unchecked cast en las llamadas con materias.
     private String val(Map<?, Object> m, String k) {
         Object v = m.get(k);
         return (v != null) ? v.toString().trim() : "";
+    }
+
+    private String amountToWords(BigDecimal amount) {
+        long pesos = amount.longValue();
+        int centavos = amount.subtract(new BigDecimal(pesos))
+            .multiply(new BigDecimal("100"))
+            .setScale(0, RoundingMode.HALF_UP).intValue();
+        return "(" + toSpanishWords(pesos) + " Pesos " + String.format("%02d", centavos) + "/100 M.N.)";
+    }
+
+    private static final String[] SW_UNITS = {
+        "", "Un", "Dos", "Tres", "Cuatro", "Cinco", "Seis", "Siete", "Ocho", "Nueve",
+        "Diez", "Once", "Doce", "Trece", "Catorce", "Quince", "Dieciséis", "Diecisiete",
+        "Dieciocho", "Diecinueve", "Veinte", "Veintiún", "Veintidós", "Veintitrés",
+        "Veinticuatro", "Veinticinco", "Veintiséis", "Veintisiete", "Veintiocho", "Veintinueve"
+    };
+    private static final String[] SW_TENS = {
+        "", "Diez", "Veinte", "Treinta", "Cuarenta", "Cincuenta", "Sesenta", "Setenta", "Ochenta", "Noventa"
+    };
+    private static final String[] SW_HUNDS = {
+        "", "Cien", "Doscientos", "Trescientos", "Cuatrocientos", "Quinientos",
+        "Seiscientos", "Setecientos", "Ochocientos", "Novecientos"
+    };
+
+    private String toSpanishWords(long n) {
+        if (n == 0) return "Cero";
+        StringBuilder sb = new StringBuilder();
+        if (n >= 1000000) {
+            long m = n / 1000000; n %= 1000000;
+            sb.append(m == 1 ? "Un Millón" : toSpanishWords(m) + " Millones");
+            if (n > 0) sb.append(" ");
+        }
+        if (n >= 1000) {
+            long t = n / 1000; n %= 1000;
+            sb.append(t == 1 ? "Mil" : toSpanishWords(t) + " Mil");
+            if (n > 0) sb.append(" ");
+        }
+        if (n >= 100) {
+            int h = (int)(n / 100); n %= 100;
+            sb.append(h == 1 && n > 0 ? "Ciento" : SW_HUNDS[h]);
+            if (n > 0) sb.append(" ");
+        }
+        if (n > 0) {
+            if (n < 30) {
+                sb.append(SW_UNITS[(int)n]);
+            } else {
+                int t = (int)(n / 10), u = (int)(n % 10);
+                sb.append(SW_TENS[t]);
+                if (u > 0) sb.append(" y ").append(SW_UNITS[u]);
+            }
+        }
+        return sb.toString().trim();
     }
 }
