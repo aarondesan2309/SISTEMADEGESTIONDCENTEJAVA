@@ -316,7 +316,6 @@
                     <div style="background:white;border-radius:16px;padding:28px;box-shadow:0 10px 30px rgba(0,0,0,0.04);border:1px solid #e2e8f0;margin-bottom:24px;">
                         <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:20px;">
                             <h3 style="color:var(--color-maroon);font-size:1.15rem;font-weight:800;font-family:var(--font-display);letter-spacing:0.5px;">PERSONAL DOCENTE</h3>
-                            <button onclick="appNavigate('docentes')" style="background:var(--color-maroon);color:white;border:none;padding:8px 18px;border-radius:8px;cursor:pointer;font-size:0.82rem;font-weight:700;">Ver Directorio Completo &rarr;</button>
                         </div>
 
                         <!-- Carrera filter pills -->
@@ -593,7 +592,10 @@
                                 <input id="p-domicilio" style="width:100%;padding:11px 14px;border:1.5px solid #e2e8f0;border-radius:10px;font-size:0.9rem;">
                             </div>
                             <div style="grid-column:1/-1;">
-                                <label class="lbl-field">MATERIAS ASIGNADAS</label>
+                                <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:6px;">
+                                    <label class="lbl-field" style="margin:0;">MATERIAS ASIGNADAS</label>
+                                    <button type="button" onclick="window.perfilNuevaMateria()" style="background:transparent;color:var(--color-maroon);border:1.5px solid var(--color-maroon);padding:3px 10px;border-radius:6px;cursor:pointer;font-size:0.75rem;font-weight:700;">+ Agregar Materia</button>
+                                </div>
                                 <div id="p-materias" style="background:#f8fafc;padding:12px 16px;border-radius:10px;font-size:0.88rem;min-height:44px;border:1px solid #e2e8f0;"></div>
                             </div>
                             <div style="grid-column:1/-1;">

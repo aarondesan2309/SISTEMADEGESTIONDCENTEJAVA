@@ -578,6 +578,45 @@ document.addEventListener('DOMContentLoaded', () => {
         cedulaStatus.innerHTML = `<span style="color:#0f766e;font-weight:600;">📄 Archivo seleccionado: </span><span style="color:#334155;">${file.name}</span> <span style="color:#94a3b8;font-size:0.8rem;">(se guardará al presionar "Guardar Cambios")</span>`;
     };
 
+    window.perfilNuevaMateria = async function() {
+        const docenteId = document.getElementById('p-id').value;
+        if (!docenteId) return alert('No hay ID de docente');
+
+        const materia = prompt('Nombre de la materia o asignatura:');
+        if (!materia || !materia.trim()) return;
+        
+        const carrera = prompt('Carrera (ej. ICI, MED, TC):');
+        if (!carrera || !carrera.trim()) return;
+
+        const horasStr = prompt('Total de horas por el semestre (ej. 16, 32):');
+        const horas = parseFloat(horasStr);
+        if (isNaN(horas)) return alert('Horas inválidas');
+
+        try {
+            const res = await fetch(`/api/asignacion/${docenteId}/nueva`, {
+                method: 'POST',
+                headers: {'Content-Type': 'application/json'},
+                body: JSON.stringify({
+                    materia: materia.trim(),
+                    carrera: carrera.trim().toUpperCase(),
+                    horas: horas,
+                    nivel_pago: 'Licenciatura'
+                })
+            });
+            const data = await res.json();
+            if (data.status === 'ok') {
+                alert('Materia agregada/actualizada correctamente.');
+                // Recargar el perfil completo para actualizar UI
+                window.verPerfil(docenteId, document.getElementById('p-carrera-display').textContent);
+                if (window.dirFilterTable) window.dirFilterTable();
+            } else {
+                alert('Error al agregar materia: ' + data.message);
+            }
+        } catch(e) {
+            alert('Error de red al agregar materia: ' + e.message);
+        }
+    };
+
     window.toggleMilitarFields = function() {
         const isMilitar = document.getElementById('p-condicion').value === 'Personal Militar';
         const campoMat = document.getElementById('campo-matricula');
@@ -1860,6 +1899,30 @@ document.addEventListener('DOMContentLoaded', () => {
             el.innerHTML = `<span style="color:#fca5a5;">Error al cargar: ${e.message}</span>`;
         }
     }
+
+    window.toggleFormNuevoPlantel = function() {
+        const form = document.getElementById('form-nuevo-plantel');
+        const btn = document.getElementById('btn-toggle-form-plantel');
+        if (!form || !btn) return;
+        
+        if (form.style.display === 'none') {
+            form.style.display = 'block';
+            btn.innerHTML = '&minus; Ocultar';
+        } else {
+            form.style.display = 'none';
+            btn.innerHTML = '+ Expandir';
+            // Clear fields on close
+            document.getElementById('np-siglas').value = '';
+            document.getElementById('np-ciclo').value = '';
+            document.getElementById('np-nombre').value = '';
+            document.getElementById('np-director').value = '';
+            document.getElementById('np-dbname').value = '';
+            document.getElementById('np-dbpass').value = '';
+            document.getElementById('np-usuarios-rows').innerHTML = '';
+            document.querySelectorAll('#np-carreras-checks input').forEach(c => c.checked = false);
+            document.getElementById('np-result-msg').innerHTML = '';
+        }
+    };
 
     window.semPrellenarConfig = function(idx) {
         const ds = _pendingSchoolDefaults[idx];
