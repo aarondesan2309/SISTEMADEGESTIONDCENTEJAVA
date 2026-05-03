@@ -311,40 +311,92 @@ document.addEventListener('DOMContentLoaded', () => {
                 kpiCard.style.background = 'linear-gradient(135deg, #991b1b, #ef4444)';
             }
 
+            // Populate carrera filter dropdown
+            const filterSelect = document.getElementById('dir-filter-carrera');
+            if (filterSelect) {
+                filterSelect.innerHTML = '<option value="">Todas las carreras</option>';
+                Object.keys(carreraGroups).sort().forEach(c => {
+                    filterSelect.innerHTML += `<option value="${c}">${c} (${carreraGroups[c].length})</option>`;
+                });
+            }
+
+            // Render the docentes table
+            window.dirFilterTable();
+
         } catch (e) {
             console.error('Error loadDirectorDashboard', e);
         }
     }
 
-    // Director: show docentes of a specific carrera inline
-    window.dirShowCarrera = function(carrera) {
-        const detail = document.getElementById('dir-carrera-detail');
-        detail.classList.remove('hidden');
-        document.getElementById('dir-carrera-detail-title').textContent = `Docentes de ${carrera}`;
+    // Director: filter and render the docentes table
+    window.dirFilterTable = function() {
+        const searchVal = (document.getElementById('dir-search-nombre')?.value || '').toLowerCase().trim();
+        const carreraVal = document.getElementById('dir-filter-carrera')?.value || '';
+        const condicionVal = document.getElementById('dir-filter-condicion')?.value || '';
 
-        const docs = _dirDocentes.filter(d => {
-            const carreras = (d.carrera || '').split(',').map(s => s.trim());
-            return carreras.includes(carrera) || (carrera === 'NA' && !d.carrera);
+        let filtered = _dirDocentes.filter(d => {
+            // Search filter
+            if (searchVal) {
+                const haystack = [d.nombre, d.rfc, d.curp, d.carrera, d.condicion].filter(Boolean).join(' ').toLowerCase();
+                if (!haystack.includes(searchVal)) return false;
+            }
+            // Carrera filter
+            if (carreraVal) {
+                const carreras = (d.carrera || '').split(',').map(s => s.trim());
+                if (!carreras.includes(carreraVal)) return false;
+            }
+            // Condicion filter
+            if (condicionVal) {
+                if ((d.condicion || '') !== condicionVal) return false;
+            }
+            return true;
         });
 
-        const listEl = document.getElementById('dir-carrera-detail-list');
-        if (docs.length === 0) {
-            listEl.innerHTML = '<span style="color:#94a3b8;">No hay docentes en esta carrera.</span>';
+        // Update count
+        const countEl = document.getElementById('dir-filter-count');
+        if (countEl) countEl.textContent = `${filtered.length} de ${_dirDocentes.length} docentes`;
+
+        // Render table
+        const tbody = document.getElementById('dir-docentes-tbody');
+        if (!tbody) return;
+
+        if (filtered.length === 0) {
+            tbody.innerHTML = '<tr><td colspan="5" style="padding:20px;text-align:center;color:#94a3b8;">No se encontraron docentes con los filtros aplicados.</td></tr>';
             return;
         }
 
-        listEl.innerHTML = docs.map(d => `
-            <div style="background:#f8fafc;border:1px solid #e2e8f0;border-radius:10px;padding:12px 14px;display:flex;justify-content:space-between;align-items:center;transition:all 0.15s;" onmouseover="this.style.borderColor='var(--color-maroon)';this.style.background='#fff5f7'" onmouseout="this.style.borderColor='#e2e8f0';this.style.background='#f8fafc'">
-                <div>
-                    <div style="font-weight:700;font-size:0.88rem;color:#1e293b;">${d.nombre}</div>
-                    <div style="font-size:0.72rem;color:#94a3b8;margin-top:2px;">${d.condicion || ''} · ${d.rfc || ''}</div>
-                </div>
-                <button onclick="window.verPerfil(${d.docente_id}, '${carrera}')" style="background:linear-gradient(135deg, #1d4ed8, #2563eb);color:white;border:none;padding:6px 14px;border-radius:7px;cursor:pointer;font-size:0.75rem;font-weight:700;white-space:nowrap;">Ver perfil</button>
-            </div>
-        `).join('');
+        tbody.innerHTML = filtered.map(d => {
+            const materias = d.materias_nombres || d.materias || '';
+            const materiasShort = materias.length > 40 ? materias.substring(0, 40) + '...' : materias;
+            const condBadge = (d.condicion || '') === 'Militar'
+                ? '<span style="background:#1e3a5f;color:white;padding:2px 8px;border-radius:10px;font-size:0.72rem;font-weight:700;">Militar</span>'
+                : '<span style="background:#f0fdf4;color:#166534;padding:2px 8px;border-radius:10px;font-size:0.72rem;font-weight:700;border:1px solid #bbf7d0;">Civil</span>';
 
-        detail.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+            return `<tr style="border-bottom:1px solid #f1f5f9;transition:background 0.15s;" onmouseover="this.style.background='#fefce8'" onmouseout="this.style.background='transparent'">
+                <td style="padding:10px 16px;">
+                    <div style="font-weight:700;color:#1e293b;font-size:0.88rem;">${d.nombre}</div>
+                    <div style="font-size:0.72rem;color:#94a3b8;">${d.rfc || ''}</div>
+                </td>
+                <td style="padding:10px 16px;">
+                    <span style="background:rgba(99,27,47,0.08);color:var(--color-maroon);padding:3px 10px;border-radius:10px;font-size:0.78rem;font-weight:700;">${d.carrera || 'N/A'}</span>
+                </td>
+                <td style="padding:10px 16px;">${condBadge}</td>
+                <td style="padding:10px 16px;color:#64748b;font-size:0.82rem;" title="${materias}">${materiasShort || '<em style="color:#cbd5e1;">—</em>'}</td>
+                <td style="padding:10px 16px;text-align:center;">
+                    <button onclick="window.verPerfil(${d.docente_id}, '${(d.carrera||'').replace(/'/g,'')}')" style="background:linear-gradient(135deg,#1d4ed8,#2563eb);color:white;border:none;padding:5px 14px;border-radius:7px;cursor:pointer;font-size:0.75rem;font-weight:700;">Ver</button>
+                </td>
+            </tr>`;
+        }).join('');
     };
+
+    // Director: clicking a carrera pill sets the filter and re-renders
+    window.dirShowCarrera = function(carrera) {
+        const sel = document.getElementById('dir-filter-carrera');
+        if (sel) sel.value = carrera;
+        window.dirFilterTable();
+        document.getElementById('dir-docentes-table')?.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+    };
+
 
 
     async function loadDocentesFromDatabase() {
@@ -1762,16 +1814,15 @@ document.addEventListener('DOMContentLoaded', () => {
                     return `<span style="background:${bg};color:white;padding:3px 10px;border-radius:12px;font-size:0.72rem;font-weight:700;margin:2px;display:inline-block;" title="${u.role}">${u.username}</span>`;
                 }).join('');
 
-                let btnHtml = '';
-                if (isUnconf) {
-                    btnHtml = `<button onclick="window.semPrellenarConfig(${d._defaultIdx})" style="background:#dc2626;color:white;border:none;padding:6px 14px;border-radius:8px;cursor:pointer;font-size:0.8rem;font-weight:800;white-space:nowrap;">\u2699\uFE0F Configurar</button>`;
-                } else {
-                    btnHtml = `<button onclick="window.semAbrirGestionPlantel('${d.database}')" style="background:var(--color-gold);color:#1a0a00;border:none;padding:6px 14px;border-radius:8px;cursor:pointer;font-size:0.8rem;font-weight:800;white-space:nowrap;">\u2699\uFE0F Gestionar</button>`;
-                }
-
                 const statusBadge = isUnconf
                     ? '<span style="background:rgba(220,38,38,0.2);color:#fca5a5;padding:2px 8px;border-radius:10px;font-size:0.65rem;font-weight:700;margin-left:6px;">NO CONFIGURADO</span>'
-                    : `<span style="background:rgba(34,197,94,0.15);color:#86efac;padding:2px 8px;border-radius:10px;font-size:0.65rem;font-weight:700;margin-left:6px;">ACTIVO</span>`;
+                    : '<span style="background:rgba(34,197,94,0.15);color:#86efac;padding:2px 8px;border-radius:10px;font-size:0.65rem;font-weight:700;margin-left:6px;">ACTIVO</span>';
+
+                const btnId = 'sem-btn-' + siglas;
+                const btnStyle = isUnconf
+                    ? 'background:#dc2626;color:white;'
+                    : 'background:var(--color-gold);color:#1a0a00;';
+                const btnLabel = isUnconf ? 'Configurar' : 'Gestionar';
 
                 card.innerHTML = `
                     <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:12px;">
@@ -1781,7 +1832,7 @@ document.addEventListener('DOMContentLoaded', () => {
                         </div>
                         <div style="display:flex;gap:8px;align-items:center;">
                             ${isUnconf ? '' : `<span style="background:rgba(255,255,255,0.1);color:rgba(255,255,255,0.8);padding:4px 10px;border-radius:20px;font-size:0.72rem;font-weight:700;">${docentes} doc.</span>`}
-                            ${btnHtml}
+                            <button id="${btnId}" style="${btnStyle}border:none;padding:6px 14px;border-radius:8px;cursor:pointer;font-size:0.8rem;font-weight:800;white-space:nowrap;">${btnLabel}</button>
                         </div>
                     </div>
                     <div style="margin-bottom:6px;">
@@ -1794,6 +1845,16 @@ document.addEventListener('DOMContentLoaded', () => {
                     </div>
                 `;
                 el.appendChild(card);
+
+                // Attach click handler AFTER appending to DOM
+                const btn = document.getElementById(btnId);
+                if (btn) {
+                    if (isUnconf) {
+                        btn.addEventListener('click', () => window.semPrellenarConfig(d._defaultIdx));
+                    } else {
+                        btn.addEventListener('click', () => window.semAbrirGestionPlantel(d.database));
+                    }
+                }
             });
         } catch(e) {
             el.innerHTML = `<span style="color:#fca5a5;">Error al cargar: ${e.message}</span>`;

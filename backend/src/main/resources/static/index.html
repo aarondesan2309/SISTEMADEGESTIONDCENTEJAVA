@@ -315,19 +315,48 @@
                     <!-- Docentes por Carrera -->
                     <div style="background:white;border-radius:16px;padding:28px;box-shadow:0 10px 30px rgba(0,0,0,0.04);border:1px solid #e2e8f0;margin-bottom:24px;">
                         <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:20px;">
-                            <h3 style="color:var(--color-maroon);font-size:1.15rem;font-weight:800;font-family:var(--font-display);letter-spacing:0.5px;">DOCENTES POR CARRERA</h3>
+                            <h3 style="color:var(--color-maroon);font-size:1.15rem;font-weight:800;font-family:var(--font-display);letter-spacing:0.5px;">PERSONAL DOCENTE</h3>
                             <button onclick="appNavigate('docentes')" style="background:var(--color-maroon);color:white;border:none;padding:8px 18px;border-radius:8px;cursor:pointer;font-size:0.82rem;font-weight:700;">Ver Directorio Completo &rarr;</button>
                         </div>
-                        <div id="dir-chart-carreras" style="display:flex;flex-wrap:wrap;gap:14px;margin-bottom:20px;">
+
+                        <!-- Carrera filter pills -->
+                        <div id="dir-chart-carreras" style="display:flex;flex-wrap:wrap;gap:10px;margin-bottom:20px;">
                             <span style="color:#64748b;font-size:0.9rem;">Cargando...</span>
                         </div>
-                        <!-- Docentes detail area (populated when clicking a carrera card) -->
-                        <div id="dir-carrera-detail" class="hidden" style="margin-top:20px;border-top:2px solid #e2e8f0;padding-top:20px;">
-                            <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:14px;">
-                                <h4 id="dir-carrera-detail-title" style="color:#334155;font-size:1rem;font-weight:800;"></h4>
-                                <button onclick="document.getElementById('dir-carrera-detail').classList.add('hidden')" style="background:#f1f5f9;border:1px solid #e2e8f0;color:#64748b;padding:4px 12px;border-radius:6px;cursor:pointer;font-size:0.78rem;">&times; Cerrar</button>
+
+                        <!-- Search & Filter Bar -->
+                        <div style="display:flex;gap:12px;align-items:center;margin-bottom:18px;flex-wrap:wrap;">
+                            <div style="flex:1;min-width:200px;position:relative;">
+                                <input type="text" id="dir-search-nombre" placeholder="Buscar por nombre, RFC, CURP..." oninput="window.dirFilterTable()" style="width:100%;padding:10px 14px 10px 38px;border:1.5px solid #e2e8f0;border-radius:10px;font-size:0.88rem;box-sizing:border-box;transition:border 0.2s;" onfocus="this.style.borderColor='var(--color-maroon)'" onblur="this.style.borderColor='#e2e8f0'">
+                                <span style="position:absolute;left:12px;top:50%;transform:translateY(-50%);color:#94a3b8;font-size:1rem;">&#128269;</span>
                             </div>
-                            <div id="dir-carrera-detail-list" style="display:grid;grid-template-columns:repeat(auto-fill,minmax(280px,1fr));gap:10px;"></div>
+                            <select id="dir-filter-carrera" onchange="window.dirFilterTable()" style="padding:10px 14px;border:1.5px solid #e2e8f0;border-radius:10px;font-size:0.88rem;min-width:160px;cursor:pointer;">
+                                <option value="">Todas las carreras</option>
+                            </select>
+                            <select id="dir-filter-condicion" onchange="window.dirFilterTable()" style="padding:10px 14px;border:1.5px solid #e2e8f0;border-radius:10px;font-size:0.88rem;min-width:140px;cursor:pointer;">
+                                <option value="">Todos</option>
+                                <option value="Militar">Militar</option>
+                                <option value="Personal Civil">Civil</option>
+                            </select>
+                            <span id="dir-filter-count" style="color:#64748b;font-size:0.82rem;font-weight:600;white-space:nowrap;"></span>
+                        </div>
+
+                        <!-- Docentes table -->
+                        <div style="overflow-x:auto;border:1px solid #f1f5f9;border-radius:12px;">
+                            <table id="dir-docentes-table" style="width:100%;border-collapse:collapse;text-align:left;font-size:0.88rem;">
+                                <thead>
+                                    <tr style="background:#f8fafc;">
+                                        <th style="padding:12px 16px;color:var(--color-maroon);font-weight:800;font-family:var(--font-display);font-size:0.82rem;">NOMBRE</th>
+                                        <th style="padding:12px 16px;color:var(--color-maroon);font-weight:800;font-family:var(--font-display);font-size:0.82rem;">CARRERA</th>
+                                        <th style="padding:12px 16px;color:var(--color-maroon);font-weight:800;font-family:var(--font-display);font-size:0.82rem;">CONDICIÓN</th>
+                                        <th style="padding:12px 16px;color:var(--color-maroon);font-weight:800;font-family:var(--font-display);font-size:0.82rem;">MATERIA</th>
+                                        <th style="padding:12px 16px;color:var(--color-maroon);font-weight:800;font-family:var(--font-display);font-size:0.82rem;text-align:center;">ACCIÓN</th>
+                                    </tr>
+                                </thead>
+                                <tbody id="dir-docentes-tbody">
+                                    <tr><td colspan="5" style="padding:20px;text-align:center;color:#94a3b8;">Cargando...</td></tr>
+                                </tbody>
+                            </table>
                         </div>
                     </div>
 
