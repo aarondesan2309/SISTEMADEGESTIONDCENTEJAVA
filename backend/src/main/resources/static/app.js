@@ -345,9 +345,9 @@ document.addEventListener('DOMContentLoaded', () => {
                 const carreras = (d.carrera || '').split(',').map(s => s.trim());
                 if (!carreras.includes(carreraVal)) return false;
             }
-            // Condicion filter
+            // Condicion filter (use includes since DB has 'Personal Civil', 'Personal Militar')
             if (condicionVal) {
-                if ((d.condicion || '') !== condicionVal) return false;
+                if (!(d.condicion || '').toLowerCase().includes(condicionVal.toLowerCase())) return false;
             }
             return true;
         });
@@ -368,7 +368,7 @@ document.addEventListener('DOMContentLoaded', () => {
         tbody.innerHTML = filtered.map(d => {
             const materias = d.materias_nombres || d.materias || '';
             const materiasShort = materias.length > 40 ? materias.substring(0, 40) + '...' : materias;
-            const condBadge = (d.condicion || '') === 'Militar'
+            const condBadge = (d.condicion || '').toLowerCase().includes('militar')
                 ? '<span style="background:#1e3a5f;color:white;padding:2px 8px;border-radius:10px;font-size:0.72rem;font-weight:700;">Militar</span>'
                 : '<span style="background:#f0fdf4;color:#166534;padding:2px 8px;border-radius:10px;font-size:0.72rem;font-weight:700;border:1px solid #bbf7d0;">Civil</span>';
 

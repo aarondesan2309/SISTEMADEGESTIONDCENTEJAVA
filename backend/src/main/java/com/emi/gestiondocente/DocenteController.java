@@ -25,7 +25,8 @@ public class DocenteController {
         String sql = """
             SELECT d.docente_id, d.nombre, d.grado_acad, d.grado_mil,
                    d.condicion, d.rfc, d.curp,
-                   string_agg(DISTINCT c.siglas, ', ') as carrera
+                   string_agg(DISTINCT c.siglas, ', ') as carrera,
+                   string_agg(DISTINCT m.nombre || ' (' || c.siglas || ')', ', ') as materias_nombres
             FROM Docente d
             LEFT JOIN Asignacion a ON d.docente_id = a.docente_id
             LEFT JOIN Materia m ON a.materia_id = m.materia_id
