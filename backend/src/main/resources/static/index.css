@@ -458,3 +458,87 @@ body {
 .eval-badge-observacion { background:#fef3c7; color:#92400e; }
 .eval-badge-noaprobado { background:#fee2e2; color:#991b1b; }
 .eval-badge-pendiente { background:#e2e8f0; color:#475569; }
+
+/* ============================================================
+   RESPONSIVE — Tablets y móviles
+   ============================================================ */
+@media (max-width: 900px) {
+  /* Landing */
+  .sem-header h1 { font-size: 2.2rem; letter-spacing: 0; }
+  .school-card { width: 260px; padding: 36px 22px; }
+  .school-logo-img { width: 120px; height: 120px; }
+
+  /* Dashboard header */
+  .top-header { padding: 16px 20px; flex-wrap: wrap; gap: 8px; }
+  .top-header h1 { font-size: 1rem; }
+
+  /* Main content */
+  .main-content { padding: 40px 20px; }
+
+  /* Module cards */
+  .grid-modules { gap: 20px; }
+  .module-card { width: 280px; padding: 50px 24px; font-size: 1.3rem; }
+
+  /* Tables */
+  .data-table th, .data-table td { padding: 12px 16px; font-size: 0.88rem; }
+}
+
+@media (max-width: 640px) {
+  /* Landing */
+  .sem-header { margin-bottom: 36px; }
+  .sem-header h1 { font-size: 1.5rem; }
+  .sem-header p { font-size: 0.9rem; }
+  .school-card { width: 100%; max-width: 340px; padding: 28px 20px; }
+  .school-logo-img { width: 100px; height: 100px; }
+  .school-card h3 { font-size: 1.1rem; }
+  .schools-grid { gap: 16px; padding: 12px; }
+
+  /* Login */
+  .login-card { padding: 32px 20px; margin: 0 12px; max-width: 100%; }
+  .login-card h2 { font-size: 1.1rem; }
+  .btn-back-landing { top: 16px; left: 16px; padding: 8px 14px; font-size: 0.82rem; }
+
+  /* Dashboard header */
+  .top-header { padding: 14px 16px; }
+  .top-header h1 { font-size: 0.88rem; letter-spacing: 0; }
+  .user-status { font-size: 0.8rem; }
+
+  /* Main content */
+  .main-content { padding: 28px 14px; }
+
+  /* Module cards full-width */
+  .module-card { width: 100%; max-width: 100%; padding: 36px 20px; font-size: 1.1rem; }
+  .grid-modules { gap: 12px; margin: 20px auto; }
+
+  /* Director dashboard */
+  #grid-director-dashboard { padding: 0 4px; }
+
+  /* Director stats */
+  #dir-stat-docentes, #dir-stat-vehiculos, #dir-stat-alertas { font-size: 2rem; }
+
+  /* Director table — stack on very small */
+  #dir-docentes-table thead th:nth-child(4) { display: none; }
+  #dir-docentes-table tbody td:nth-child(4) { display: none; }
+
+  /* Filters wrap */
+  #dir-search-nombre { min-width: 100% !important; }
+
+  /* Logout button */
+  .btn-logout-floating { bottom: 16px; right: 16px; padding: 10px 18px; font-size: 0.88rem; }
+
+  /* Perfil modal inner padding */
+  #modal-perfil > div > div[style*="padding:32px 36px"],
+  #modal-dir-resumen > div > div[style*="padding:24px 28px"] { padding: 20px 16px !important; }
+
+  /* Tables generic */
+  .data-table th, .data-table td { padding: 10px 12px; font-size: 0.82rem; }
+
+  /* SEM panel */
+  #admin-sem-panel { padding: 20px 14px; }
+}
+
+@media (max-width: 420px) {
+  .sem-header h1 { font-size: 1.2rem; }
+  .login-card { padding: 24px 14px; }
+  .top-header h1 { font-size: 0.78rem; }
+}

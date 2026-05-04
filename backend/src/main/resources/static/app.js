@@ -303,7 +303,7 @@ document.addEventListener('DOMContentLoaded', () => {
                             </div>
                             <div style="display:flex;align-items:center;gap:10px;">
                                 <span style="background:${textColor};color:white;padding:4px 12px;border-radius:20px;font-size:0.85rem;font-weight:900;">${puntaje.toFixed(1)}</span>
-                                <button onclick="window.verPerfil(${ev.docente_id}, '${carrera}')" style="background:var(--color-maroon);color:white;border:none;padding:5px 12px;border-radius:6px;cursor:pointer;font-size:0.72rem;font-weight:700;">Ver perfil</button>
+                                <button onclick="window.verPerfilDir(${ev.docente_id}, '${carrera}')" style="background:var(--color-maroon);color:white;border:none;padding:5px 12px;border-radius:6px;cursor:pointer;font-size:0.72rem;font-weight:700;">Ver perfil</button>
                             </div>
                         </div>`;
                     }
@@ -394,7 +394,7 @@ document.addEventListener('DOMContentLoaded', () => {
                 <td style="padding:10px 16px;">${condBadge}</td>
                 <td style="padding:10px 16px;color:#64748b;font-size:0.82rem;" title="${materias}">${materiasShort || '<em style="color:#cbd5e1;">—</em>'}</td>
                 <td style="padding:10px 16px;text-align:center;">
-                    <button onclick="window.verPerfil(${d.docente_id}, '${(d.carrera||'').replace(/'/g,'')}')" style="background:linear-gradient(135deg,#1d4ed8,#2563eb);color:white;border:none;padding:5px 14px;border-radius:7px;cursor:pointer;font-size:0.75rem;font-weight:700;">Ver</button>
+                    <button onclick="window.verPerfilDir(${d.docente_id}, '${(d.carrera||'').replace(/'/g,'')}')" style="background:linear-gradient(135deg,#1d4ed8,#2563eb);color:white;border:none;padding:5px 14px;border-radius:7px;cursor:pointer;font-size:0.75rem;font-weight:700;">Ver</button>
                 </td>
             </tr>`;
         }).join('');
@@ -571,18 +571,6 @@ document.addEventListener('DOMContentLoaded', () => {
             switchPerfilTab('datos');
 
             document.getElementById('modal-perfil').classList.remove('hidden');
-
-            // Modo solo-lectura para el Director
-            const dirMode = currentUser && currentUser.role === 'DIR';
-            ['p-nombre','p-grado-acad','p-grado-mil','p-matricula','p-rfc','p-curp',
-             'p-condicion','p-genero','p-sangre','p-ine','p-domicilio'].forEach(id => {
-                const el = document.getElementById(id);
-                if (el) { el.disabled = dirMode; el.style.opacity = dirMode ? '0.75' : ''; }
-            });
-            ['btn-guardar-perfil','btn-nueva-materia','lbl-foto-upload','lbl-cedula-upload'].forEach(id => {
-                const el = document.getElementById(id);
-                if (el) el.style.display = dirMode ? 'none' : '';
-            });
         } catch(e) {
             alert('Error cargando perfil del docente: ' + e.message);
         }
@@ -592,16 +580,85 @@ document.addEventListener('DOMContentLoaded', () => {
         document.getElementById('modal-perfil').classList.add('hidden');
         document.getElementById('p-foto-input').value = '';
         document.getElementById('p-cedula-input').value = '';
-        // Restaurar estado editable para cuando otro rol abra el modal
-        ['p-nombre','p-grado-acad','p-grado-mil','p-matricula','p-rfc','p-curp',
-         'p-condicion','p-genero','p-sangre','p-ine','p-domicilio'].forEach(id => {
-            const el = document.getElementById(id);
-            if (el) { el.disabled = false; el.style.opacity = ''; }
-        });
-        ['btn-guardar-perfil','btn-nueva-materia','lbl-foto-upload','lbl-cedula-upload'].forEach(id => {
-            const el = document.getElementById(id);
-            if (el) el.style.display = '';
-        });
+    };
+
+    // ============================================================
+    // RESUMEN DIRECTOR — modal de solo lectura para rol DIR
+    // ============================================================
+    window.verPerfilDir = async function(id, carreraStr) {
+        try {
+            const [docRes, matRes, evalRes, expRes] = await Promise.all([
+                fetch(`/api/docentes/${id}`),
+                fetch(`/api/materias/${id}`).catch(() => ({ok:false})),
+                fetch(`/api/evaluaciones`).catch(() => ({ok:false})),
+                fetch(`/api/expediente/${id}`).catch(() => ({ok:false}))
+            ]);
+            if (!docRes.ok) throw new Error('Docente no encontrado');
+            const d = await docRes.json();
+            const mats = matRes.ok ? await matRes.json() : [];
+            const evaluaciones = evalRes.ok ? await evalRes.json() : [];
+            const expediente = expRes.ok ? await expRes.json() : [];
+
+            // Foto / iniciales
+            const fotoImg = document.getElementById('dr-foto-img');
+            const fotoInit = document.getElementById('dr-foto-initials');
+            if (d.foto_path) {
+                fotoImg.src = `/fotos/${d.foto_path}`;
+                fotoImg.style.display = 'block';
+                fotoInit.style.display = 'none';
+            } else {
+                fotoImg.style.display = 'none';
+                fotoInit.style.display = 'block';
+                fotoInit.textContent = (d.nombre || '?').split(' ').map(w => w[0]).slice(0, 2).join('').toUpperCase();
+            }
+
+            const isMil = d.condicion === 'Personal Militar';
+            document.getElementById('dr-badge-bar').innerHTML =
+                `<span style="background:rgba(255,255,255,0.2);color:white;padding:2px 10px;border-radius:20px;font-size:0.72rem;font-weight:700;border:1px solid rgba(255,255,255,0.3);">${isMil ? 'PERSONAL MILITAR' : 'PERSONAL CIVIL'}</span>`;
+            document.getElementById('dr-nombre').textContent = d.nombre || '—';
+            document.getElementById('dr-carrera-display').textContent = carreraStr || d.carrera || '';
+
+            // Campos clave
+            document.getElementById('dr-rfc').textContent = d.rfc || '—';
+            document.getElementById('dr-curp').textContent = d.curp || '—';
+            const gradoMap = { 'L':'Licenciatura','M':'Maestría','D':'Doctorado','T':'Técnico','E':'Especialización','m':'Maestría' };
+            const gaVal = (d.grado_acad || '').trim();
+            document.getElementById('dr-grado-acad').textContent = gradoMap[gaVal] || gaVal || '—';
+            document.getElementById('dr-grado-mil').textContent = d.grado_mil || '—';
+            document.getElementById('dr-grado-mil-card').style.display = isMil ? '' : 'none';
+
+            // Materias
+            document.getElementById('dr-materias').innerHTML = mats.length
+                ? mats.map(m => `<span style="display:inline-block;background:#eef2ff;color:#3730a3;padding:3px 10px;border-radius:6px;margin:3px;font-size:0.82rem;">${m.materia} <em style="color:#888;">(${m.carrera})</em></span>`).join('')
+                : '<em style="color:#aaa;">Sin materias asignadas</em>';
+
+            // Evaluación más reciente
+            const evalsDoc = evaluaciones.filter(e => String(e.docente_id) === String(id));
+            const lastEval = evalsDoc.sort((a, b) => (b.evaluacion_id || 0) - (a.evaluacion_id || 0))[0];
+            if (lastEval) {
+                const p = parseFloat(lastEval.puntaje_total) || 0;
+                const col = p >= 80 ? '#16a34a' : p >= 70 ? '#d97706' : '#dc2626';
+                document.getElementById('dr-eval-score').innerHTML = `<span style="color:${col};">${p.toFixed(1)}</span>`;
+                document.getElementById('dr-eval-fecha').textContent = lastEval.fecha_evaluacion ? 'Fecha: ' + lastEval.fecha_evaluacion : '';
+            } else {
+                document.getElementById('dr-eval-score').textContent = '—';
+                document.getElementById('dr-eval-fecha').textContent = 'Sin evaluación registrada';
+            }
+
+            // Expediente — conteo de documentos subidos
+            const totalDocs = 16;
+            const uploaded = Array.isArray(expediente) ? expediente.filter(e => e.archivo_path).length : 0;
+            document.getElementById('dr-exp-progress').textContent = `${uploaded} / ${totalDocs} documentos`;
+            document.getElementById('dr-exp-bar').style.width = `${Math.round(uploaded / totalDocs * 100)}%`;
+
+            document.getElementById('modal-dir-resumen').classList.remove('hidden');
+        } catch(e) {
+            alert('Error cargando resumen del docente: ' + e.message);
+        }
+    };
+
+    window.cerrarDirResumen = function() {
+        document.getElementById('modal-dir-resumen').classList.add('hidden');
     };
 
     window.previewCedula = function(input) {
