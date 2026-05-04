@@ -154,11 +154,10 @@ document.addEventListener('DOMContentLoaded', () => {
     // Handle Logout
     btnLogout.addEventListener('click', () => {
         sessionStorage.removeItem('sgdc_jwt');
-        localStorage.removeItem('sgdc_tenant');
         currentUser = null;
-        currentSchool = null;
         appWrapper.classList.add('auth-hidden');
-        landingWrapper.classList.remove('auth-hidden');
+        loginWrapper.classList.remove('auth-hidden');
+        loadQuickRoles();
     });
 
     function initApp() {
@@ -572,6 +571,18 @@ document.addEventListener('DOMContentLoaded', () => {
             switchPerfilTab('datos');
 
             document.getElementById('modal-perfil').classList.remove('hidden');
+
+            // Modo solo-lectura para el Director
+            const dirMode = currentUser && currentUser.role === 'DIR';
+            ['p-nombre','p-grado-acad','p-grado-mil','p-matricula','p-rfc','p-curp',
+             'p-condicion','p-genero','p-sangre','p-ine','p-domicilio'].forEach(id => {
+                const el = document.getElementById(id);
+                if (el) { el.disabled = dirMode; el.style.opacity = dirMode ? '0.75' : ''; }
+            });
+            ['btn-guardar-perfil','btn-nueva-materia','lbl-foto-upload','lbl-cedula-upload'].forEach(id => {
+                const el = document.getElementById(id);
+                if (el) el.style.display = dirMode ? 'none' : '';
+            });
         } catch(e) {
             alert('Error cargando perfil del docente: ' + e.message);
         }
@@ -581,6 +592,16 @@ document.addEventListener('DOMContentLoaded', () => {
         document.getElementById('modal-perfil').classList.add('hidden');
         document.getElementById('p-foto-input').value = '';
         document.getElementById('p-cedula-input').value = '';
+        // Restaurar estado editable para cuando otro rol abra el modal
+        ['p-nombre','p-grado-acad','p-grado-mil','p-matricula','p-rfc','p-curp',
+         'p-condicion','p-genero','p-sangre','p-ine','p-domicilio'].forEach(id => {
+            const el = document.getElementById(id);
+            if (el) { el.disabled = false; el.style.opacity = ''; }
+        });
+        ['btn-guardar-perfil','btn-nueva-materia','lbl-foto-upload','lbl-cedula-upload'].forEach(id => {
+            const el = document.getElementById(id);
+            if (el) el.style.display = '';
+        });
     };
 
     window.previewCedula = function(input) {
