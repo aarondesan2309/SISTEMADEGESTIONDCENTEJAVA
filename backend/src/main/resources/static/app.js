@@ -1809,8 +1809,20 @@ document.addEventListener('DOMContentLoaded', () => {
             sel.onchange = () => { if (sel.value) localStorage.setItem('sgdc_tenant', sel.value); };
             loadQuickRoles();
         } catch(e) {
-            sel.innerHTML = '<option value="">Error al cargar planteles</option>';
-            console.error('[plantel-select]', e);
+            // Fallback: usar la escuela seleccionada desde el landing
+            console.warn('[plantel-select] /api/escuelas no disponible, usando fallback:', e.message);
+            if (schoolCode) {
+                sel.innerHTML = '';
+                const opt = document.createElement('option');
+                opt.value = 'gestion_docente_' + schoolCode.toLowerCase();
+                opt.textContent = schoolCode;
+                opt.selected = true;
+                sel.appendChild(opt);
+                localStorage.setItem('sgdc_tenant', opt.value);
+                loadQuickRoles();
+            } else {
+                sel.innerHTML = '<option value="">Sin conexión al servidor</option>';
+            }
         }
     }
 
