@@ -831,44 +831,6 @@ document.addEventListener('DOMContentLoaded', () => {
         }
     };
 
-    async function loadVehiculosFromDatabase() {
-        const tbody = document.getElementById('vehiculos-tbody');
-        if(!tbody) return;
-
-        try {
-            tbody.innerHTML = "<tr><td colspan='5'>Sincronizando vehículos de la base de datos...</td></tr>";
-            
-            const res = await fetch('/api/vehiculos');
-            if (!res.ok) throw new Error("Error en servidor local");
-            const vehiculos = await res.json();
-            
-            tbody.innerHTML = ""; 
-
-            vehiculos.forEach(v => {
-                if (currentUser.role !== 'ADM' && ['ICI','ICE','II','IC','TC'].includes(currentUser.role)) {
-                    const carreras = (v.carrera || '').split(',').map(s => s.trim());
-                    if (!carreras.includes(currentUser.role)) return;
-                }
-
-                const tr = document.createElement('tr');
-                tr.innerHTML = `
-                    <td><strong>${v.docente}</strong></td>
-                    <td>${v.marca} ${v.modelo || ''}</td>
-                    <td>${v.anio || '-'} | ${v.color || '-'}</td>
-                    <td><span style="font-family:monospace; background:#eee; padding:2px 6px; border-radius:4px; font-weight:bold;">${v.placas || 'S/P'}</span></td>
-                    <td><span style="color:green; font-weight:bold;">● AUTORIZADO</span></td>
-                `;
-                tbody.appendChild(tr);
-            });
-            
-            if (tbody.innerHTML === "") {
-                tbody.innerHTML = "<tr><td colspan='5'>No hay vehículos registrados en el sistema.</td></tr>";
-            }
-        } catch (err) {
-            console.error(err);
-            tbody.innerHTML = "<tr><td colspan='5' style='color:red'>Error al cargar vehículos.</td></tr>";
-        }
-    }
     window.openAddModal = function() { document.getElementById('modal-add-docente').classList.remove('hidden'); }
     window.closeAddModal = function() {
         document.getElementById('modal-add-docente').classList.add('hidden');
