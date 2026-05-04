@@ -10,14 +10,17 @@
         init = init || {};
         if (typeof url === 'string' && url.startsWith('/api/')) {
             if (ctx) url = ctx + url;
+            init.headers = Object.assign({}, init.headers || {});
             const token = sessionStorage.getItem('sgdc_jwt');
             if (token && url.indexOf('/api/login') === -1) {
-                init.headers = Object.assign({}, init.headers || {}, { 'Authorization': 'Bearer ' + token });
+                init.headers['Authorization'] = 'Bearer ' + token;
             }
+            const tenant = localStorage.getItem('sgdc_tenant');
+            if (tenant) init.headers['X-Tenant-ID'] = tenant;
         }
         return _fetch.call(this, url, init);
     };
-    console.log('[fetch-interceptor] context=' + ctx + ' (JWT auto-attach activo)');
+    console.log('[fetch-interceptor] context=' + ctx + ' (JWT + X-Tenant-ID auto-attach activo)');
 })();
 
 document.addEventListener('DOMContentLoaded', () => {
@@ -38,7 +41,8 @@ document.addEventListener('DOMContentLoaded', () => {
         document.getElementById('login-school-title').textContent = "( " + schoolCode + " )";
         landingWrapper.classList.add('auth-hidden');
         loginWrapper.classList.remove('auth-hidden');
-        loadQuickRoles();
+        // loadPlantelesSelect fija el tenant en localStorage y luego llama a loadQuickRoles
+        loadPlantelesSelect(schoolCode);
     };
 
     window.backToLanding = function() {
@@ -120,9 +124,15 @@ document.addEventListener('DOMContentLoaded', () => {
         btn.disabled = true;
 
         try {
+            const tenantId = document.getElementById('login-plantel').value;
+            if (!tenantId) { alert('Selecciona un plantel antes de ingresar.'); btn.innerHTML = ogBtn; btn.disabled = false; return; }
+            // Fijar tenant antes de hacer fetch para que el interceptor lo incluya
+            localStorage.setItem('sgdc_tenant', tenantId);
+            currentSchool = tenantId.replace('gestion_docente_', '').toUpperCase();
+
             const res = await fetch('/api/login', {
                 method: 'POST',
-                headers: {'Content-Type': 'application/json'},
+                headers: {'Content-Type': 'application/json', 'X-Tenant-ID': tenantId},
                 body: JSON.stringify({username: username, password: pass})
             });
             const data = await res.json();
@@ -144,7 +154,9 @@ document.addEventListener('DOMContentLoaded', () => {
     // Handle Logout
     btnLogout.addEventListener('click', () => {
         sessionStorage.removeItem('sgdc_jwt');
+        localStorage.removeItem('sgdc_tenant');
         currentUser = null;
+        currentSchool = null;
         appWrapper.classList.add('auth-hidden');
         landingWrapper.classList.remove('auth-hidden');
     });
@@ -1768,6 +1780,40 @@ document.addEventListener('DOMContentLoaded', () => {
         }
     }
 
+    async function loadPlantelesSelect(schoolCode) {
+        const sel = document.getElementById('login-plantel');
+        if (!sel) return;
+        sel.innerHTML = '<option value="">Cargando planteles...</option>';
+        try {
+            const res = await fetch('/api/escuelas');
+            if (!res.ok) throw new Error('HTTP ' + res.status);
+            const list = await res.json();
+            sel.innerHTML = '';
+            list.forEach(e => {
+                const dbName = e.datname;
+                const siglas = dbName.replace('gestion_docente_', '').toUpperCase();
+                const opt = document.createElement('option');
+                opt.value = dbName;
+                opt.textContent = siglas + ' — ' + dbName;
+                if (schoolCode && siglas === schoolCode.toUpperCase()) opt.selected = true;
+                sel.appendChild(opt);
+            });
+            if (sel.options.length === 0) {
+                sel.innerHTML = '<option value="">No hay planteles configurados</option>';
+                return;
+            }
+            // Si ninguna opción quedó seleccionada, elegir la primera
+            if (!sel.value) sel.selectedIndex = 0;
+            // Fijar tenant activo y recargar quick-roles con el tenant correcto
+            localStorage.setItem('sgdc_tenant', sel.value);
+            sel.onchange = () => { if (sel.value) localStorage.setItem('sgdc_tenant', sel.value); };
+            loadQuickRoles();
+        } catch(e) {
+            sel.innerHTML = '<option value="">Error al cargar planteles</option>';
+            console.error('[plantel-select]', e);
+        }
+    }
+
     async function loadSemQuickUsers() {
         const listEl = document.getElementById('sem-quick-list');
         if (!listEl) return;
@@ -1885,13 +1931,13 @@ document.addEventListener('DOMContentLoaded', () => {
                 `;
                 el.appendChild(card);
 
-                // Attach click handler AFTER appending to DOM
-                const btn = document.getElementById(btnId);
+                // Attach click handler AFTER appending to DOM (using card.querySelector to be 100% sure)
+                const btn = card.querySelector('#' + btnId);
                 if (btn) {
                     if (isUnconf) {
-                        btn.addEventListener('click', () => window.semPrellenarConfig(d._defaultIdx));
+                        btn.onclick = () => { window.semPrellenarConfig(d._defaultIdx); };
                     } else {
-                        btn.addEventListener('click', () => window.semAbrirGestionPlantel(d.database));
+                        btn.onclick = () => { window.semAbrirGestionPlantel(d.database); };
                     }
                 }
             });
@@ -1940,10 +1986,21 @@ document.addEventListener('DOMContentLoaded', () => {
 
         // Open form if closed
         const form = document.getElementById('form-nuevo-plantel');
-        if (form.style.display === 'none') {
+        if (window.getComputedStyle(form).display === 'none') {
             window.toggleFormNuevoPlantel();
         }
-        form.scrollIntoView({ behavior: 'smooth' });
+        
+        // Clear and pre-fill users
+        document.getElementById('np-usuarios-rows').innerHTML = '';
+        const baseRoles = [
+            {u: 'admin', p: 'admin', r: 'ADM'},
+            {u: 'dir', p: 'director', r: 'DIR'},
+            {u: 'sem', p: 'sem', r: 'SEM'},
+            {u: 'jsa', p: 'jsa', r: 'JSA'}
+        ];
+        baseRoles.forEach(x => window.npAgregarUsuario(x.u, x.p, x.r));
+
+        form.scrollIntoView({ behavior: 'smooth', block: 'start' });
     };
 
     // Modal de gestión rápida de plantel existente
@@ -1973,7 +2030,8 @@ document.addEventListener('DOMContentLoaded', () => {
         ];
         const existingSiglas = carreras.map(c => c.siglas);
 
-        const ROLES = ['ADM', 'DIR', 'JSA', 'SEM', 'ICI', 'ICE', 'II', 'IC', 'TC', 'MED', 'ODO', 'ENF'];
+        let ROLES = ['ADM', 'DIR', 'JSA', 'SEM', 'ICI', 'ICE', 'II', 'IC', 'TC', 'MED', 'ODO', 'ENF', 'FAR', 'BIO', 'QFB'];
+        existingSiglas.forEach(s => { if (!ROLES.includes(s)) ROLES.push(s); });
 
         const usuariosHtml = usuarios.map(u => {
             const bg = ROLE_COLORS[u.role] || '#374151';
@@ -2048,12 +2106,30 @@ document.addEventListener('DOMContentLoaded', () => {
                 <!-- Carreras -->
                 <div style="background:#f8fafc;border:1.5px solid #e2e8f0;border-radius:12px;padding:16px;">
                     <h4 style="color:#1e3a5f;font-size:0.88rem;text-transform:uppercase;letter-spacing:1px;margin-bottom:12px;">📚 Carreras del Plantel</h4>
-                    <div style="display:grid;grid-template-columns:1fr 1fr;gap:6px;margin-bottom:12px;">${carrerasCheckHtml}</div>
+                    <div style="display:grid;grid-template-columns:1fr 1fr;gap:6px;margin-bottom:12px;" id="gp-carreras-grid">${carrerasCheckHtml}</div>
+                    
+                    <div style="display:flex; gap:8px; margin-bottom:12px; align-items:center;">
+                        <input type="text" id="gp-nueva-carrera-siglas" placeholder="Siglas (Ej: FAR)" style="padding:6px 10px;border:1.5px solid #e2e8f0;border-radius:6px;font-size:0.85rem;width:120px;text-transform:uppercase;">
+                        <button onclick="window.semAgregarCarreraCustom()" style="background:#e0f2fe;color:#0369a1;border:1px solid #bae6fd;padding:6px 14px;border-radius:6px;cursor:pointer;font-size:0.82rem;font-weight:700;">+ Añadir Opción</button>
+                    </div>
+
                     <div id="gp-car-msg" style="min-height:18px;font-size:0.82rem;margin-bottom:8px;"></div>
                     <button onclick="window.semAgregarCarrerasPlantel('${dbname}')" style="background:#0369a1;color:white;border:none;padding:9px 20px;border-radius:9px;cursor:pointer;font-weight:700;font-size:0.9rem;">📚 Guardar Carreras Seleccionadas</button>
                 </div>
             </div>
         </div>`;
+    };
+
+    window.semAgregarCarreraCustom = function() {
+        const sigEl = document.getElementById('gp-nueva-carrera-siglas');
+        const siglas = sigEl.value.trim().toUpperCase();
+        if (!siglas) { alert("Debe ingresar la abreviatura."); return; }
+        const grid = document.getElementById('gp-carreras-grid');
+        const label = document.createElement('label');
+        label.style.cssText = 'display:flex;align-items:center;gap:5px;font-size:0.85rem;cursor:pointer;padding:4px 8px;border-radius:6px;background:#f0f9ff;';
+        label.innerHTML = `<input type="checkbox" value="${siglas}" class="gp-car-chk" checked> <strong>${siglas}</strong> — (Nueva)`;
+        grid.appendChild(label);
+        sigEl.value = '';
     };
 
     window.semQuickRole = function(dbname, role, username, password) {
@@ -2113,34 +2189,49 @@ document.addEventListener('DOMContentLoaded', () => {
         if (ok > 0) { setTimeout(() => window.semAbrirGestionPlantel(dbname), 800); loadAdminEscuelas(); }
     };
 
-    window.toggleFormNuevoPlantel = function() {
-        const form = document.getElementById('form-nuevo-plantel');
-        const btn = document.getElementById('btn-toggle-form-plantel');
-        const visible = form.style.display !== 'none';
-        form.style.display = visible ? 'none' : 'block';
-        btn.textContent = visible ? '+ Expandir' : '− Colapsar';
-    };
-
-    window.npAgregarUsuario = function() {
+    window.npAgregarUsuario = function(defU = '', defP = '', defR = 'ADM') {
         const row = document.createElement('div');
         row.style.cssText = 'display:grid;grid-template-columns:1fr 1fr 120px 40px;gap:8px;margin-bottom:8px;';
+        
+        const roles = ['ADM','DIR','SEM','JSA','ICI','ICE','II','IC','TC','MED','ODO','ENF','FAR','BIO','QFB'];
+        if (defR && !roles.includes(defR)) roles.push(defR);
+        const optionsHtml = roles.map(r => `<option value="${r}" ${defR === r ? 'selected' : ''}>${r}</option>`).join('');
+
         row.innerHTML = `
-            <input type="text" placeholder="Usuario" class="np-u-user" style="padding:8px 10px;border:1.5px solid #e2e8f0;border-radius:7px;font-size:0.88rem;">
-            <input type="text" placeholder="Contraseña" class="np-u-pass" style="padding:8px 10px;border:1.5px solid #e2e8f0;border-radius:7px;font-size:0.88rem;">
+            <input type="text" placeholder="Usuario" class="np-u-user" value="${defU}" style="padding:8px 10px;border:1.5px solid #e2e8f0;border-radius:7px;font-size:0.88rem;">
+            <input type="text" placeholder="Contraseña" class="np-u-pass" value="${defP}" style="padding:8px 10px;border:1.5px solid #e2e8f0;border-radius:7px;font-size:0.88rem;">
             <select class="np-u-role" style="padding:8px 10px;border:1.5px solid #e2e8f0;border-radius:7px;font-size:0.88rem;">
-                <option>ADM</option><option>DIR</option><option>SEM</option><option>JSA</option>
-                <option>ICI</option><option>ICE</option><option>II</option><option>IC</option><option>TC</option>
+                ${optionsHtml}
             </select>
             <button type="button" onclick="this.parentElement.remove()" style="background:#fee2e2;color:#dc2626;border:none;border-radius:7px;cursor:pointer;font-weight:700;">✕</button>
         `;
         document.getElementById('np-usuarios-rows').appendChild(row);
     };
 
+    window.npAgregarCarreraCheck = function() {
+        const sigEl = document.getElementById('np-nueva-carrera-siglas');
+        const nomEl = document.getElementById('np-nueva-carrera-nombre');
+        const siglas = sigEl.value.trim().toUpperCase();
+        const nombre = nomEl.value.trim();
+        if (!siglas || !nombre) { alert("Debe ingresar la abreviatura y el nombre."); return; }
+        
+        const container = document.getElementById('np-carreras-checks');
+        const label = document.createElement('label');
+        label.style.cssText = 'display:flex;align-items:center;gap:5px;font-size:0.88rem;cursor:pointer;background:#f0f9ff;padding:4px 8px;border-radius:6px;';
+        label.innerHTML = `<input type="checkbox" value="${siglas}" checked> ${siglas} - ${nombre}`;
+        container.appendChild(label);
+        
+        sigEl.value = '';
+        nomEl.value = '';
+        
+        // Also add a user for this new career
+        window.npAgregarUsuario(siglas.toLowerCase(), siglas.toLowerCase(), siglas);
+    };
+
     window.npGuardarPlantel = async function() {
         const siglas  = document.getElementById('np-siglas').value.trim();
         const nombre  = document.getElementById('np-nombre').value.trim();
         const ciclo   = document.getElementById('np-ciclo').value.trim();
-        const director= document.getElementById('np-director').value.trim();
         if (!siglas || !nombre || !ciclo) { alert('Siglas, Nombre y Ciclo son obligatorios.'); return; }
 
         const carreras = Array.from(document.querySelectorAll('#np-carreras-checks input:checked')).map(c => c.value);
@@ -2153,7 +2244,7 @@ document.addEventListener('DOMContentLoaded', () => {
         });
 
         const payload = {
-            siglas, nombre, ciclo, director, carreras, usuarios,
+            siglas, nombre, ciclo, carreras, usuarios,
             dbHost: document.getElementById('np-dbhost').value.trim(),
             dbPort: document.getElementById('np-dbport').value.trim(),
         };

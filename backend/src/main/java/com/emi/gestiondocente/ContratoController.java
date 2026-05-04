@@ -1,5 +1,6 @@
 package com.emi.gestiondocente;
 
+import com.emi.gestiondocente.config.TenantContext;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.http.HttpHeaders;
@@ -154,13 +155,24 @@ public class ContratoController {
                                 "El docente no tiene horas asignadas en esta materia."));
             }
 
-            // ✅ FIX 5: Verificar que la plantilla .docx existe en disco antes de intentar
-            // leerla.
-            File templateFile = new File(templatePath);
+            // Resolver plantilla: primero intenta plantilla_EMI.docx (por tenant),
+            // si no existe usa la plantilla por defecto configurada en properties.
+            String tenant = TenantContext.getCurrentTenant();
+            String actualTemplatePath = templatePath;
+            if (tenant != null && !tenant.isBlank()) {
+                String suffix = tenant.replaceFirst("^gestion_docente_", "").toUpperCase();
+                String specificPath = templatePath.replace(".docx", "_" + suffix + ".docx");
+                File specificFile = new File(specificPath);
+                if (specificFile.exists() && specificFile.isFile()) {
+                    actualTemplatePath = specificPath;
+                }
+            }
+
+            File templateFile = new File(actualTemplatePath);
             if (!templateFile.exists() || !templateFile.isFile()) {
                 return ResponseEntity.internalServerError()
                         .body(Collections.singletonMap("message",
-                                "No se encontró la plantilla Word en: " + templatePath +
+                                "No se encontró la plantilla Word en: " + actualTemplatePath +
                                         ". Verifica la propiedad sgdc.storage.contrato-template en application.properties."));
             }
 
@@ -199,17 +211,12 @@ public class ContratoController {
                     docId, materiaId);
 
             Map<String, String> replacements = buildReplacements(docente, materias, folio);
-            byte[] docxBytes = modifyZip(templatePath, replacements);
+            byte[] docxBytes = modifyZip(actualTemplatePath, replacements);
 
             // ✅ FIX 7: Nombre de archivo seguro — elimina caracteres problemáticos
             // incluyendo acentos y ñ.
             String nombreLimpio = docente.get("nombre").toString()
-                    .replaceAll("[áàäâ]", "a").replaceAll("[ÁÀÄÂ]", "A")
-                    .replaceAll("[éèëê]", "e").replaceAll("[ÉÈËÊ]", "E")
-                    .replaceAll("[íìïî]", "i").replaceAll("[ÍÌÏÎ]", "I")
-                    .replaceAll("[óòöô]", "o").replaceAll("[ÓÒÖÔ]", "O")
-                    .replaceAll("[úùüû]", "u").replaceAll("[ÚÙÜÛ]", "U")
-                    .replaceAll("[ñ]", "n").replaceAll("[Ñ]", "N")
+                    .replaceAll("[^a-zA-Z0-9_\\- ]", "")
                     .replaceAll("[^a-zA-Z0-9_\\- ]", "")
                     .replaceAll("\\s+", "_").trim();
             String fileName = "Contrato_" + nombreLimpio + "_" +
