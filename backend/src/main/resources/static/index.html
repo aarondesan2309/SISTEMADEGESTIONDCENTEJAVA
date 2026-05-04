@@ -313,10 +313,10 @@
                             <div id="dir-stat-docentes" style="font-size:2.8rem;font-weight:900;margin-top:4px;font-family:var(--font-display);">--</div>
                             <div style="font-size:0.72rem;margin-top:6px;opacity:0.85;">Activos en este ciclo</div>
                         </div>
-                        <div style="background:linear-gradient(135deg, #7c2d12, #f59e0b);color:white;padding:22px;border-radius:14px;box-shadow:0 4px 20px rgba(245,158,11,0.25);">
+                        <div style="background:linear-gradient(135deg, #7c2d12, #f59e0b);color:white;padding:22px;border-radius:14px;box-shadow:0 4px 20px rgba(245,158,11,0.25);cursor:pointer;" onclick="document.getElementById('dir-vehiculos-section').scrollIntoView({behavior:'smooth'})">
                             <div style="font-size:0.78rem;text-transform:uppercase;letter-spacing:1px;opacity:0.8;font-weight:700;">Vehículos Registrados</div>
                             <div id="dir-stat-vehiculos" style="font-size:2.8rem;font-weight:900;margin-top:4px;font-family:var(--font-display);">--</div>
-                            <div style="font-size:0.72rem;margin-top:6px;opacity:0.85;">Control vehicular interno</div>
+                            <div style="font-size:0.72rem;margin-top:6px;opacity:0.85;">Ver listado completo &darr;</div>
                         </div>
                         <div id="dir-eval-kpi-card" style="background:linear-gradient(135deg, #4c1d95, #8b5cf6);color:white;padding:22px;border-radius:14px;box-shadow:0 4px 20px rgba(139,92,246,0.25);cursor:pointer;" onclick="document.getElementById('dir-alertas-section').scrollIntoView({behavior:'smooth'})">
                             <div style="font-size:0.78rem;text-transform:uppercase;letter-spacing:1px;opacity:0.8;font-weight:700;">Alertas Evaluación</div>
@@ -374,11 +374,39 @@
 
                     <!-- Alertas de Evaluación baja -->
                     <div id="dir-alertas-section" style="background:white;border-radius:16px;padding:28px;box-shadow:0 10px 30px rgba(0,0,0,0.04);border:1px solid #e2e8f0;margin-bottom:24px;">
-                        <h3 style="color:#991b1b;font-size:1.15rem;font-weight:800;font-family:var(--font-display);letter-spacing:0.5px;margin-bottom:16px;">⚠ DOCENTES CON EVALUACIÓN BAJA</h3>
+                        <h3 style="color:#991b1b;font-size:1.15rem;font-weight:800;font-family:var(--font-display);letter-spacing:0.5px;margin-bottom:16px;">&#9888; DOCENTES CON EVALUACIÓN BAJA</h3>
                         <p style="color:#64748b;font-size:0.82rem;margin-bottom:16px;">Docentes cuya evaluación requiere atención del Director.</p>
                         <div id="dir-alertas-list" style="display:grid;grid-template-columns:repeat(auto-fill,minmax(300px,1fr));gap:12px;">
                             <span style="color:#94a3b8;font-size:0.85rem;">Cargando...</span>
                         </div>
+                    </div>
+
+                    <!-- Control Vehicular -->
+                    <div id="dir-vehiculos-section" style="background:white;border-radius:16px;padding:28px;box-shadow:0 10px 30px rgba(0,0,0,0.04);border:1px solid #e2e8f0;margin-bottom:24px;">
+                        <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:16px;flex-wrap:wrap;gap:10px;">
+                            <h3 style="color:#92400e;font-size:1.15rem;font-weight:800;font-family:var(--font-display);letter-spacing:0.5px;">&#128664; CONTROL VEHICULAR</h3>
+                            <div style="position:relative;">
+                                <input type="text" id="dir-veh-search" placeholder="Buscar docente o placas..." oninput="window.dirFilterVehiculos()" style="padding:8px 12px 8px 34px;border:1.5px solid #e2e8f0;border-radius:9px;font-size:0.85rem;width:220px;box-sizing:border-box;transition:border 0.2s;" onfocus="this.style.borderColor='#92400e'" onblur="this.style.borderColor='#e2e8f0'">
+                                <span style="position:absolute;left:10px;top:50%;transform:translateY(-50%);color:#94a3b8;font-size:0.9rem;">&#128269;</span>
+                            </div>
+                        </div>
+                        <div style="overflow-x:auto;border:1px solid #f1f5f9;border-radius:12px;">
+                            <table style="width:100%;border-collapse:collapse;font-size:0.88rem;">
+                                <thead>
+                                    <tr style="background:#fffbeb;">
+                                        <th style="padding:11px 16px;color:#92400e;font-weight:800;font-family:var(--font-display);font-size:0.8rem;text-align:left;">DOCENTE</th>
+                                        <th style="padding:11px 16px;color:#92400e;font-weight:800;font-family:var(--font-display);font-size:0.8rem;text-align:left;">CARRERA</th>
+                                        <th style="padding:11px 16px;color:#92400e;font-weight:800;font-family:var(--font-display);font-size:0.8rem;text-align:left;">VEHÍCULO</th>
+                                        <th style="padding:11px 16px;color:#92400e;font-weight:800;font-family:var(--font-display);font-size:0.8rem;text-align:left;">AÑO / COLOR</th>
+                                        <th style="padding:11px 16px;color:#92400e;font-weight:800;font-family:var(--font-display);font-size:0.8rem;text-align:left;">PLACAS</th>
+                                    </tr>
+                                </thead>
+                                <tbody id="dir-vehiculos-tbody">
+                                    <tr><td colspan="5" style="padding:20px;text-align:center;color:#94a3b8;">Cargando...</td></tr>
+                                </tbody>
+                            </table>
+                        </div>
+                        <div id="dir-veh-count" style="margin-top:10px;font-size:0.8rem;color:#94a3b8;text-align:right;"></div>
                     </div>
 
                 </div>

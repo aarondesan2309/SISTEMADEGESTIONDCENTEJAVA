@@ -223,7 +223,8 @@ document.addEventListener('DOMContentLoaded', () => {
     // ==========================================
     // DATA FETCHING & REAL DATABASE CONNECTION
     // ==========================================
-    let _dirDocentes = []; // global for director drill-down
+    let _dirDocentes = [];
+    let _dirVehiculos = [];
 
     async function loadDirectorDashboard() {
         try {
@@ -234,11 +235,14 @@ document.addEventListener('DOMContentLoaded', () => {
             ]);
 
             _dirDocentes = docRes.ok ? await docRes.json() : [];
-            let vehiculos = vehRes.ok ? await vehRes.json() : [];
+            _dirVehiculos = vehRes.ok ? await vehRes.json() : [];
             let evaluaciones = evalRes.ok ? await evalRes.json() : [];
 
             document.getElementById('dir-stat-docentes').textContent = _dirDocentes.length;
-            document.getElementById('dir-stat-vehiculos').textContent = vehiculos.length;
+            document.getElementById('dir-stat-vehiculos').textContent = _dirVehiculos.length;
+
+            // --- Tabla de vehículos ---
+            window.dirFilterVehiculos();
 
             // --- Desglose por carreras (clickable cards) ---
             const carreraGroups = {};
@@ -406,6 +410,43 @@ document.addEventListener('DOMContentLoaded', () => {
         if (sel) sel.value = carrera;
         window.dirFilterTable();
         document.getElementById('dir-docentes-table')?.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+    };
+
+    // Director: filtrar y renderizar tabla de vehículos
+    window.dirFilterVehiculos = function() {
+        const tbody = document.getElementById('dir-vehiculos-tbody');
+        const countEl = document.getElementById('dir-veh-count');
+        if (!tbody) return;
+
+        const q = (document.getElementById('dir-veh-search')?.value || '').toLowerCase().trim();
+        const filtered = q
+            ? _dirVehiculos.filter(v =>
+                [v.docente, v.placas, v.marca, v.modelo, v.carrera, v.color]
+                    .filter(Boolean).join(' ').toLowerCase().includes(q))
+            : _dirVehiculos;
+
+        if (filtered.length === 0) {
+            tbody.innerHTML = `<tr><td colspan="5" style="padding:20px;text-align:center;color:#94a3b8;">${_dirVehiculos.length === 0 ? 'No hay vehículos registrados.' : 'Sin resultados para la búsqueda.'}</td></tr>`;
+            if (countEl) countEl.textContent = '';
+            return;
+        }
+
+        tbody.innerHTML = filtered.map(v => `
+            <tr style="border-bottom:1px solid #f1f5f9;transition:background 0.15s;" onmouseover="this.style.background='#fffbeb'" onmouseout="this.style.background='transparent'">
+                <td style="padding:10px 16px;">
+                    <div style="font-weight:700;color:#1e293b;font-size:0.88rem;">${v.docente || '—'}</div>
+                </td>
+                <td style="padding:10px 16px;">
+                    <span style="background:rgba(146,64,14,0.08);color:#92400e;padding:3px 10px;border-radius:10px;font-size:0.78rem;font-weight:700;">${v.carrera || 'N/A'}</span>
+                </td>
+                <td style="padding:10px 16px;color:#334155;font-weight:600;">${v.marca || ''}${v.modelo ? ' ' + v.modelo : ''}</td>
+                <td style="padding:10px 16px;color:#64748b;font-size:0.85rem;">${v.anio || '—'} / ${v.color || '—'}</td>
+                <td style="padding:10px 16px;">
+                    <span style="font-family:monospace;font-weight:800;background:#fef3c7;color:#92400e;padding:3px 10px;border-radius:7px;font-size:0.9rem;border:1px solid #fde68a;">${v.placas || 'S/P'}</span>
+                </td>
+            </tr>`).join('');
+
+        if (countEl) countEl.textContent = `${filtered.length} de ${_dirVehiculos.length} vehículos`;
     };
 
 
