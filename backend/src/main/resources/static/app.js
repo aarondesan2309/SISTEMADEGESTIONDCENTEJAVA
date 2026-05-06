@@ -569,6 +569,11 @@ document.addEventListener('DOMContentLoaded', () => {
             document.getElementById('p-sangre').value = d.tipo_sangre || '';
             document.getElementById('p-ine').value = d.credencial_ine || '';
             document.getElementById('p-domicilio').value = d.domicilio || '';
+            document.getElementById('p-natural-de').value = d.natural_de || 'Ciudad de México';
+            document.getElementById('p-estado-natural').value = d.estado_natural || '';
+            document.getElementById('p-estado-civil').value = d.estado_civil || '';
+            document.getElementById('p-estudios-en').value = d.estudios_en || '';
+            document.getElementById('p-fecha-contratacion').value = d.fecha_contratacion || '';
 
             // Aplicar toggle campos militar/civil
             toggleMilitarFields();
@@ -1063,6 +1068,11 @@ document.addEventListener('DOMContentLoaded', () => {
             tipo_sangre: document.getElementById('p-sangre').value,
             credencial_ine: document.getElementById('p-ine').value,
             domicilio: document.getElementById('p-domicilio').value,
+            natural_de: document.getElementById('p-natural-de').value,
+            estado_natural: document.getElementById('p-estado-natural').value,
+            estado_civil: document.getElementById('p-estado-civil').value,
+            estudios_en: document.getElementById('p-estudios-en').value,
+            fecha_contratacion: document.getElementById('p-fecha-contratacion').value,
         };
         try {
             // 1. Guardar datos del perfil

@@ -1,5 +1,6 @@
 package com.emi.gestiondocente;
 
+import jakarta.annotation.PostConstruct;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.http.ResponseEntity;
 import org.springframework.jdbc.core.JdbcTemplate;
@@ -16,6 +17,20 @@ public class DocenteController {
 
     @Autowired
     private JdbcTemplate jdbcTemplate;
+
+    @PostConstruct
+    public void initExtraColumns() {
+        String[] cols = {
+            "ALTER TABLE docente ADD COLUMN IF NOT EXISTS natural_de VARCHAR(100) DEFAULT 'Ciudad de México'",
+            "ALTER TABLE docente ADD COLUMN IF NOT EXISTS estado_natural VARCHAR(100)",
+            "ALTER TABLE docente ADD COLUMN IF NOT EXISTS estado_civil VARCHAR(30)",
+            "ALTER TABLE docente ADD COLUMN IF NOT EXISTS estudios_en VARCHAR(255)",
+            "ALTER TABLE docente ADD COLUMN IF NOT EXISTS fecha_contratacion VARCHAR(60)"
+        };
+        for (String sql : cols) {
+            try { jdbcTemplate.execute(sql); } catch (Exception ignored) {}
+        }
+    }
 
     // =============================================
     // GET /api/docentes — Lista completa
@@ -255,7 +270,12 @@ public class DocenteController {
                     genero = ?,
                     tipo_sangre = ?,
                     credencial_ine = ?,
-                    domicilio = ?
+                    domicilio = ?,
+                    natural_de = ?,
+                    estado_natural = ?,
+                    estado_civil = ?,
+                    estudios_en = ?,
+                    fecha_contratacion = ?
                 WHERE docente_id = ?
                 """,
                 str(payload.get("nombre")),
@@ -269,6 +289,11 @@ public class DocenteController {
                 str(payload.get("tipo_sangre")),
                 str(payload.get("credencial_ine")),
                 str(payload.get("domicilio")),
+                str(payload.get("natural_de")),
+                str(payload.get("estado_natural")),
+                str(payload.get("estado_civil")),
+                str(payload.get("estudios_en")),
+                str(payload.get("fecha_contratacion")),
                 id
             );
             Map<String, Object> result = new HashMap<>();
