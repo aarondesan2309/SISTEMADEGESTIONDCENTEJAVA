@@ -32,11 +32,13 @@ public class MateriaController {
                    MAX(COALESCE(a.horas_m4, 0)) as horas_m4,
                    MAX(a.nivel_pago) as nivel_pago,
                    MAX(d.grado_acad) as grado,
-                   EXISTS(SELECT 1 FROM contrato_emitido ce WHERE ce.docente_id = a.docente_id AND ce.materia_id = m.materia_id) as ya_emitido
+                   MAX(ce.folio) as folio,
+                   EXISTS(SELECT 1 FROM contrato_emitido ce2 WHERE ce2.docente_id = a.docente_id AND ce2.materia_id = m.materia_id) as ya_emitido
             FROM Asignacion a
             JOIN Materia m ON a.materia_id = m.materia_id
             LEFT JOIN Carrera c ON m.carrera_id = c.carrera_id
             JOIN Docente d ON a.docente_id = d.docente_id
+            LEFT JOIN contrato_emitido ce ON ce.docente_id = a.docente_id AND ce.materia_id = m.materia_id
             WHERE a.docente_id = ?
             GROUP BY m.materia_id, m.nombre, c.siglas, a.docente_id
             ORDER BY m.nombre

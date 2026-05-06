@@ -32,7 +32,7 @@ public class SecurityConfig {
             }))
             .sessionManagement(sm -> sm.sessionCreationPolicy(SessionCreationPolicy.STATELESS))
             .authorizeHttpRequests(auth -> auth
-                .requestMatchers("/api/login", "/api/usuarios-roles").permitAll()
+                .requestMatchers("/api/login", "/api/usuarios-roles", "/api/escuelas").permitAll()
                 .requestMatchers("/api/**").authenticated()
                 .anyRequest().permitAll()   // recursos estáticos, fotos, etc.
             )

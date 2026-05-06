@@ -214,8 +214,15 @@
 
                     <div style="margin-top:18px;">
                         <label class="lbl-field">CARRERAS ACADÉMICAS</label>
-                        <div style="display:flex;flex-wrap:wrap;gap:10px;margin-top:8px;" id="np-carreras-checks">
-                            <!-- Las carreras se añadirán dinámicamente -->
+                        <div style="display:flex;flex-wrap:wrap;gap:8px;margin-top:8px;" id="np-carreras-checks">
+                            <label style="display:flex;align-items:center;gap:5px;padding:6px 12px;border:1.5px solid #e2e8f0;border-radius:20px;cursor:pointer;font-size:0.82rem;font-weight:600;"><input type="checkbox" value="ICI"> ICI — Computación e Informática</label>
+                            <label style="display:flex;align-items:center;gap:5px;padding:6px 12px;border:1.5px solid #e2e8f0;border-radius:20px;cursor:pointer;font-size:0.82rem;font-weight:600;"><input type="checkbox" value="ICE"> ICE — Comunicaciones y Electrónica</label>
+                            <label style="display:flex;align-items:center;gap:5px;padding:6px 12px;border:1.5px solid #e2e8f0;border-radius:20px;cursor:pointer;font-size:0.82rem;font-weight:600;"><input type="checkbox" value="II"> II — Ingeniería Industrial</label>
+                            <label style="display:flex;align-items:center;gap:5px;padding:6px 12px;border:1.5px solid #e2e8f0;border-radius:20px;cursor:pointer;font-size:0.82rem;font-weight:600;"><input type="checkbox" value="IC"> IC — Construcción Militar</label>
+                            <label style="display:flex;align-items:center;gap:5px;padding:6px 12px;border:1.5px solid #e2e8f0;border-radius:20px;cursor:pointer;font-size:0.82rem;font-weight:600;"><input type="checkbox" value="TC"> TC — Tronco Común</label>
+                            <label style="display:flex;align-items:center;gap:5px;padding:6px 12px;border:1.5px solid #e2e8f0;border-radius:20px;cursor:pointer;font-size:0.82rem;font-weight:600;"><input type="checkbox" value="MED"> MED — Medicina</label>
+                            <label style="display:flex;align-items:center;gap:5px;padding:6px 12px;border:1.5px solid #e2e8f0;border-radius:20px;cursor:pointer;font-size:0.82rem;font-weight:600;"><input type="checkbox" value="ODO"> ODO — Odontología</label>
+                            <label style="display:flex;align-items:center;gap:5px;padding:6px 12px;border:1.5px solid #e2e8f0;border-radius:20px;cursor:pointer;font-size:0.82rem;font-weight:600;"><input type="checkbox" value="ENF"> ENF — Enfermería</label>
                         </div>
                         <div style="display:flex; gap:8px; margin-top:12px; align-items:center;">
                             <input type="text" id="np-nueva-carrera-siglas" placeholder="Abreviatura (Ej: FAR)" style="padding:6px 10px;border:1.5px solid #e2e8f0;border-radius:6px;font-size:0.85rem;width:160px;text-transform:uppercase;">
@@ -654,6 +661,7 @@
                         </div>
                         <input type="hidden" id="p-id">
                         <div style="margin-top:28px;display:flex;gap:12px;">
+                            <button type="button" onclick="window.generarPerfilDocente(document.getElementById('p-id').value)" style="flex:1;background:linear-gradient(135deg,#1e3a5f,#2563eb);color:white;border:none;padding:14px;border-radius:12px;cursor:pointer;font-weight:700;font-family:var(--font-main);font-size:0.92rem;">&#128196; Generar Perfil</button>
                             <button id="btn-guardar-perfil" class="btn-action" style="flex:2;" onclick="guardarPerfil()">&#10003; Guardar Cambios</button>
                             <button onclick="cerrarPerfil()" style="flex:1;background:transparent;color:#64748b;border:1.5px solid #e2e8f0;padding:14px;border-radius:12px;cursor:pointer;font-weight:700;font-family:var(--font-main);transition:all 0.2s;" onmouseover="this.style.background='#f8fafc'" onmouseout="this.style.background='transparent'">Cerrar</button>
                         </div>
@@ -936,12 +944,10 @@
                                     <th>ID</th>
                                     <th>DOCENTE</th>
                                     <th>PERIODO</th>
-                                    <th>DESEMPEÑO (30%)</th>
-                                    <th>PEDAGOGÍA (30%)</th>
-                                    <th>PERFIL (20%)</th>
-                                    <th>RESP. (20%)</th>
-                                    <th>FINAL</th>
+                                    <th>RÚBRICA</th>
+                                    <th>PUNTAJE</th>
                                     <th>RESULTADO</th>
+                                    <th></th>
                                 </tr>
                             </thead>
                             <tbody id="evaluaciones-tbody">
@@ -964,16 +970,12 @@
                     </div>
                     <!-- Body -->
                     <div style="padding:28px 32px;">
-                        <div style="display:grid;grid-template-columns:1fr 1fr;gap:16px;margin-bottom:24px;">
+                        <div style="display:grid;grid-template-columns:1fr 1fr;gap:16px;margin-bottom:18px;">
                             <div style="grid-column:1/-1;">
                                 <label class="lbl-field">DOCENTE <span style="color:#c0392b;">*</span></label>
                                 <select id="eval-docente" required style="width:100%;padding:10px 13px;border:1.5px solid #e2e8f0;border-radius:9px;font-size:0.95rem;">
                                     <option value="">-- Seleccionar Docente --</option>
                                 </select>
-                            </div>
-                            <div>
-                                <label class="lbl-field">EVALUADOR</label>
-                                <input id="eval-evaluador" placeholder="Nombre del evaluador" style="width:100%;padding:10px 13px;border:1.5px solid #e2e8f0;border-radius:9px;font-size:0.95rem;box-sizing:border-box;">
                             </div>
                             <div>
                                 <label class="lbl-field">PERIODO</label>
@@ -982,45 +984,89 @@
                                     <option value="Sep-Feb 2027">Sep-Feb 2027</option>
                                 </select>
                             </div>
+                            <div>
+                                <label class="lbl-field">FECHA DE EVALUACIÓN</label>
+                                <input type="date" id="eval-fecha" style="width:100%;padding:10px 13px;border:1.5px solid #e2e8f0;border-radius:9px;font-size:0.92rem;box-sizing:border-box;">
+                            </div>
                         </div>
 
-                        <!-- Criterios con sliders -->
-                        <h4 style="color:var(--color-maroon);font-family:var(--font-display);margin-bottom:16px;font-size:0.95rem;">CRITERIOS DE EVALUACIÓN</h4>
+                        <!-- Situación y Concepto Personal -->
+                        <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px;margin-bottom:18px;">
+                            <div>
+                                <label class="lbl-field">SITUACIÓN</label>
+                                <select id="eval-situacion" style="width:100%;padding:10px 13px;border:1.5px solid #e2e8f0;border-radius:9px;font-size:0.92rem;">
+                                    <option value="CONTRATADO">CONTRATADO</option>
+                                    <option value="RECONTRATADO">RECONTRATADO</option>
+                                </select>
+                            </div>
+                            <div>
+                                <label class="lbl-field">EVALUADOR (Jefe Secc. Académica)</label>
+                                <input id="eval-evaluador" placeholder="Nombre y grado del evaluador" style="width:100%;padding:10px 13px;border:1.5px solid #e2e8f0;border-radius:9px;font-size:0.92rem;box-sizing:border-box;">
+                            </div>
+                        </div>
+                        <div style="margin-bottom:18px;">
+                            <label class="lbl-field">CONCEPTO PERSONAL DEL DOCENTE</label>
+                            <textarea id="eval-concepto-personal" rows="3" style="width:100%;padding:10px 13px;border:1.5px solid #e2e8f0;border-radius:9px;font-size:0.9rem;resize:vertical;box-sizing:border-box;font-family:var(--font-main);" placeholder="Descripción de la presentación personal, actitud y valores del docente..."></textarea>
+                        </div>
+
+                        <!-- Rúbrica oficial SEDENA -->
+                        <h4 style="color:var(--color-maroon);font-family:var(--font-display);margin-bottom:4px;font-size:0.95rem;">CONCEPTO ACADÉMICO</h4>
+                        <p style="font-size:0.78rem;color:#64748b;margin-bottom:14px;">Marque con una "X" la ponderación que más describa al docente</p>
 
                         <div class="eval-criterion">
                             <div class="eval-criterion-header">
-                                <span>&#128218; Desempeño Académico <strong>(30%)</strong></span>
-                                <span id="eval-val-desemp" class="eval-val-display">50</span>
+                                <span>Habilidades Docentes <strong>(30%)</strong></span>
+                                <span id="eval-val-desemp" class="eval-val-display">—</span>
                             </div>
-                            <p class="eval-criterion-desc">Planeación didáctica, dominio disciplinar, actualización de contenidos</p>
-                            <input type="range" id="eval-desemp" min="0" max="100" value="50" class="eval-slider" oninput="updateEvalCalc()">
+                            <div style="display:flex;gap:6px;flex-wrap:wrap;margin-top:8px;">
+                                <label class="rubric-opt"><input type="radio" name="rubrica-habilidades" value="Excelente" onchange="updateEvalCalc()"> Excelente</label>
+                                <label class="rubric-opt"><input type="radio" name="rubrica-habilidades" value="Muy Bien" onchange="updateEvalCalc()"> Muy Bien</label>
+                                <label class="rubric-opt"><input type="radio" name="rubrica-habilidades" value="Bien" onchange="updateEvalCalc()"> Bien</label>
+                                <label class="rubric-opt"><input type="radio" name="rubrica-habilidades" value="Regular" onchange="updateEvalCalc()"> Regular</label>
+                                <label class="rubric-opt"><input type="radio" name="rubrica-habilidades" value="Malo" onchange="updateEvalCalc()"> Malo</label>
+                            </div>
                         </div>
 
                         <div class="eval-criterion">
                             <div class="eval-criterion-header">
-                                <span>&#128172; Calidad Pedagógica <strong>(30%)</strong></span>
-                                <span id="eval-val-pedag" class="eval-val-display">50</span>
+                                <span>Dominio de la Unidad de Aprendizaje <strong>(30%)</strong></span>
+                                <span id="eval-val-pedag" class="eval-val-display">—</span>
                             </div>
-                            <p class="eval-criterion-desc">Métodos de enseñanza, comunicación, fomento de valores</p>
-                            <input type="range" id="eval-pedag" min="0" max="100" value="50" class="eval-slider" oninput="updateEvalCalc()">
+                            <div style="display:flex;gap:6px;flex-wrap:wrap;margin-top:8px;">
+                                <label class="rubric-opt"><input type="radio" name="rubrica-dominio" value="Excelente" onchange="updateEvalCalc()"> Excelente</label>
+                                <label class="rubric-opt"><input type="radio" name="rubrica-dominio" value="Muy Bien" onchange="updateEvalCalc()"> Muy Bien</label>
+                                <label class="rubric-opt"><input type="radio" name="rubrica-dominio" value="Bien" onchange="updateEvalCalc()"> Bien</label>
+                                <label class="rubric-opt"><input type="radio" name="rubrica-dominio" value="Regular" onchange="updateEvalCalc()"> Regular</label>
+                                <label class="rubric-opt"><input type="radio" name="rubrica-dominio" value="Malo" onchange="updateEvalCalc()"> Malo</label>
+                            </div>
                         </div>
 
                         <div class="eval-criterion">
                             <div class="eval-criterion-header">
-                                <span>&#127891; Cumplimiento de Perfil <strong>(20%)</strong></span>
-                                <span id="eval-val-perfil" class="eval-val-display">50</span>
+                                <span>Empleo de TICS <strong>(20%)</strong></span>
+                                <span id="eval-val-perfil" class="eval-val-display">—</span>
                             </div>
-                            <p class="eval-criterion-desc">Adecuación formación vs programa, actualización profesional</p>
-                            <input type="range" id="eval-perfil" min="0" max="100" value="50" class="eval-slider" oninput="updateEvalCalc()">
+                            <div style="display:flex;gap:6px;flex-wrap:wrap;margin-top:8px;">
+                                <label class="rubric-opt"><input type="radio" name="rubrica-tics" value="Excelente" onchange="updateEvalCalc()"> Excelente</label>
+                                <label class="rubric-opt"><input type="radio" name="rubrica-tics" value="Muy Bien" onchange="updateEvalCalc()"> Muy Bien</label>
+                                <label class="rubric-opt"><input type="radio" name="rubrica-tics" value="Bien" onchange="updateEvalCalc()"> Bien</label>
+                                <label class="rubric-opt"><input type="radio" name="rubrica-tics" value="Regular" onchange="updateEvalCalc()"> Regular</label>
+                                <label class="rubric-opt"><input type="radio" name="rubrica-tics" value="Malo" onchange="updateEvalCalc()"> Malo</label>
+                            </div>
                         </div>
 
                         <div class="eval-criterion">
                             <div class="eval-criterion-header">
-                                <span>&#9989; Responsabilidad Institucional <strong>(20%)</strong></span>
-                                <span id="eval-val-resp" class="eval-val-display">50</span>
+                                <span>Vinculación UA con la Práctica <strong>(20%)</strong></span>
+                                <span id="eval-val-resp" class="eval-val-display">—</span>
                             </div>
-                            <p class="eval-criterion-desc">Cumplimiento normativo, puntualidad, compromiso institucional</p>
-                            <input type="range" id="eval-resp" min="0" max="100" value="50" class="eval-slider" oninput="updateEvalCalc()">
+                            <div style="display:flex;gap:6px;flex-wrap:wrap;margin-top:8px;">
+                                <label class="rubric-opt"><input type="radio" name="rubrica-vinculacion" value="Excelente" onchange="updateEvalCalc()"> Excelente</label>
+                                <label class="rubric-opt"><input type="radio" name="rubrica-vinculacion" value="Muy Bien" onchange="updateEvalCalc()"> Muy Bien</label>
+                                <label class="rubric-opt"><input type="radio" name="rubrica-vinculacion" value="Bien" onchange="updateEvalCalc()"> Bien</label>
+                                <label class="rubric-opt"><input type="radio" name="rubrica-vinculacion" value="Regular" onchange="updateEvalCalc()"> Regular</label>
+                                <label class="rubric-opt"><input type="radio" name="rubrica-vinculacion" value="Malo" onchange="updateEvalCalc()"> Malo</label>
+                            </div>
                         </div>
 
                         <!-- Resultado calculado -->

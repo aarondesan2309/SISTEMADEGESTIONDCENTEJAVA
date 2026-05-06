@@ -542,3 +542,38 @@ body {
   .login-card { padding: 24px 14px; }
   .top-header h1 { font-size: 0.78rem; }
 }
+
+/* Rubric radio buttons for eval form */
+.rubric-opt {
+  display: flex;
+  align-items: center;
+  gap: 5px;
+  padding: 6px 14px;
+  border: 1.5px solid #e2e8f0;
+  border-radius: 20px;
+  cursor: pointer;
+  font-size: 0.82rem;
+  font-weight: 600;
+  transition: all 0.18s;
+  user-select: none;
+  white-space: nowrap;
+}
+.rubric-opt:has(input:checked) {
+  background: var(--color-maroon);
+  color: white;
+  border-color: var(--color-maroon);
+}
+.rubric-opt input[type="radio"] { accent-color: var(--color-maroon); }
+
+/* Active semester badge in docentes list */
+.badge-activo {
+  background: #16a34a; color: white;
+  padding: 1px 8px; border-radius: 10px;
+  font-size: 0.67rem; font-weight: 700; letter-spacing: 0.5px;
+  vertical-align: middle; margin-left: 4px;
+}
+.badge-sin-asignar {
+  background: #94a3b8; color: white;
+  padding: 1px 7px; border-radius: 10px;
+  font-size: 0.67rem; vertical-align: middle; margin-left: 4px;
+}

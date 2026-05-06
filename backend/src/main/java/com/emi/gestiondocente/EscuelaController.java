@@ -330,6 +330,7 @@ public class EscuelaController {
             return ResponseEntity.ok(result);
         } catch (Exception e) {
             result.put("status", "error");
+            result.put("database", dbname);
             result.put("message", e.getMessage());
             return ResponseEntity.ok(result);
         }

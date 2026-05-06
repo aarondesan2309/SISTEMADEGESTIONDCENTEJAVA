@@ -490,16 +490,19 @@ document.addEventListener('DOMContentLoaded', () => {
                 const isMilitar = d.condicion === 'Personal Militar';
                 if(isMilitar) countMil++; else countCiv++;
 
-                const badge = isMilitar 
-                    ? '<span style="background:#631b2f;color:white;padding:2px 8px;border-radius:4px;font-size:0.72rem;font-weight:700;">MIL.</span>' 
+                const badge = isMilitar
+                    ? '<span style="background:#631b2f;color:white;padding:2px 8px;border-radius:4px;font-size:0.72rem;font-weight:700;">MIL.</span>'
                     : '<span style="background:#64748b;color:white;padding:2px 8px;border-radius:4px;font-size:0.72rem;">CIV.</span>';
                 const gradoDisplay = (d.grado_mil && d.grado_mil.trim()) ? d.grado_mil.trim() : (d.grado_acad ? d.grado_acad.trim() : '');
+                const activoBadge = (d.materias_nombres && d.materias_nombres.trim())
+                    ? '<span class="badge-activo">ACTIVO</span>'
+                    : '<span class="badge-sin-asignar">SIN ASIGNAR</span>';
                 
                 const tr = document.createElement('tr');
                 tr.innerHTML = `
                     <td><strong>${carreraDisplay}</strong>${notaOtrasCarreras}</td>
                     <td style="text-align:center">${d.docente_id}</td>
-                    <td>${badge} <strong>${gradoDisplay}</strong> ${d.nombre}</td>
+                    <td>${badge} <strong>${gradoDisplay}</strong> ${d.nombre}${activoBadge}</td>
                     <td style="font-family:monospace;font-size:0.82rem">${d.rfc || 'S/R'}</td>
                     <td style="font-family:monospace;font-size:0.78rem;color:#666">${d.curp || '-'}</td>
                     <td>
@@ -700,6 +703,234 @@ document.addEventListener('DOMContentLoaded', () => {
 
     window.cerrarDirResumen = function() {
         document.getElementById('modal-dir-resumen').classList.add('hidden');
+    };
+
+    // ── Generar Perfil del Docente (ventana imprimible) ──
+    const _CARRERAS_NOM = {
+        ICI:'Ingeniero en Computación e Informática', ICE:'Ingeniero en Comunicaciones y Electrónica',
+        II:'Ingeniero Industrial', IC:'Ingeniero Constructor Militar', TC:'Tronco Común',
+        MED:'Medicina', ODO:'Odontología', ENF:'Enfermería', FAR:'Farmacología', BIO:'Biología'
+    };
+    function _tarifaHora(nivel) {
+        const n = (nivel||'').toLowerCase();
+        if (n==='doctorado') return 1048.95;
+        if (n.includes('maest')) return 734.27;
+        if (n.includes('tec')) return 199.30;
+        return 419.58;
+    }
+    function _edadCurp(curp) {
+        if (!curp||curp.length<10) return '—';
+        const yy = parseInt(curp.substring(4,6));
+        return new Date().getFullYear() - (yy >= 24 ? 1900+yy : 2000+yy);
+    }
+    const _MESES_CONTRATO = ['Marzo','Abril','Mayo','Junio'];
+
+    window.generarPerfilDocente = async function(docId) {
+        if (!docId) return alert('ID de docente no disponible.');
+        try {
+            const [docRes, matRes] = await Promise.all([
+                fetch(`/api/docentes/${docId}`),
+                fetch(`/api/materias/${docId}`)
+            ]);
+            const d = await docRes.json();
+            const mats = matRes.ok ? await matRes.json() : [];
+
+            const fotoUrl = d.foto_path ? `/fotos/${d.foto_path}` : null;
+            const carreraSiglas = (d.carrera||'').split(',')[0].trim();
+            const programaNombre = _CARRERAS_NOM[carreraSiglas] || carreraSiglas || '—';
+            const edad = _edadCurp(d.curp);
+            const esMilitar = (d.condicion||'').toLowerCase().includes('militar');
+            const generoLabel = (d.genero||'M').toUpperCase() === 'F' ? 'Mujer' : 'Hombre';
+
+            function colMateria(mat) {
+                if (!mat) return '<td></td><td></td>';
+                const tarifa = _tarifaHora(mat.nivel_pago);
+                const hs = [mat.horas_m1, mat.horas_m2, mat.horas_m3, mat.horas_m4].map(Number);
+                const totalHs = hs.reduce((a,b)=>a+b,0);
+                const totalMonto = hs.reduce((a,h)=>a+h*tarifa,0);
+                const fmt = n => '$' + n.toLocaleString('es-MX',{minimumFractionDigits:2,maximumFractionDigits:2});
+                const filasMes = hs.map((h,i)=>h>0?`<tr><td>${_MESES_CONTRATO[i]}</td><td>${h}</td><td>${fmt(h*tarifa)}</td></tr>`:'').join('');
+                return `<td style="padding:0;vertical-align:top;">
+                    <table style="width:100%;border-collapse:collapse;font-size:0.78rem;">
+                        <tr style="background:#f1f5f9;"><td style="padding:4px 6px;font-size:0.7rem;text-transform:uppercase;letter-spacing:0.5px;font-weight:700;" colspan="3">Folio: ${mat.folio||'(sin contrato)'}</td></tr>
+                        <tr><td style="padding:3px 6px;font-size:0.7rem;" colspan="3">Carga horaria total: <strong>${totalHs} hrs</strong></td></tr>
+                        <tr><td style="padding:3px 6px;font-size:0.7rem;" colspan="3">Monto total: <strong>${fmt(totalMonto)}</strong></td></tr>
+                        <tr style="background:#e2e8f0;"><th style="padding:3px 6px;font-size:0.7rem;">Mes</th><th style="padding:3px 6px;font-size:0.7rem;">Hs./mes</th><th style="padding:3px 6px;font-size:0.7rem;">$/mes</th></tr>
+                        ${filasMes||'<tr><td colspan="3" style="padding:4px 6px;color:#aaa;font-size:0.7rem;">Sin horas capturadas</td></tr>'}
+                    </table>
+                </td>`;
+            }
+
+            const m1 = mats[0]||null, m2 = mats[1]||null;
+            const materiasNom = mats.map(m=>m.materia).join(', ') || '—';
+            const nivelAcad = {L:'Licenciatura',M:'Maestría',D:'Doctorado',T:'Técnico',E:'Especialización'}[d.grado_acad]||d.grado_acad||'—';
+
+            const TABLE_STYLE = 'width:100%;border-collapse:collapse;margin-bottom:0;';
+            const TD = 'style="border:1px solid #bbb;padding:6px 10px;font-size:0.82rem;"';
+            const TH = 'style="border:1px solid #bbb;padding:6px 10px;font-size:0.82rem;font-weight:700;background:#f1f5f9;"';
+
+            const html = `<!DOCTYPE html><html lang="es"><head><meta charset="UTF-8">
+            <title>Perfil Docente — ${d.nombre}</title>
+            <style>
+              body{font-family:Arial,sans-serif;margin:20mm 15mm;font-size:13px;color:#000;}
+              table{width:100%;border-collapse:collapse;}
+              td,th{border:1px solid #999;padding:5px 8px;font-size:0.82rem;vertical-align:top;}
+              th{background:#eee;font-weight:700;}
+              .header{display:flex;justify-content:space-between;margin-bottom:10px;font-size:0.78rem;}
+              .title{text-align:center;font-weight:900;font-size:1rem;text-transform:uppercase;border:2px solid #000;padding:6px;margin-bottom:10px;}
+              .photo-box{width:90px;height:110px;border:1px solid #999;display:flex;align-items:center;justify-content:center;overflow:hidden;flex-shrink:0;}
+              .photo-box img{width:100%;height:100%;object-fit:cover;}
+              @media print{body{margin:10mm;}}
+            </style></head><body>
+            <div class="header">
+              <div>DIR. GRAL. EDUC. MIL. Y<br>RECTORÍA DE LA U.D.E.F.A. Y G.N.</div>
+              <div style="text-align:right;">ESCUELA MILITAR DE INGENIERÍA<br>SECCIÓN ACADÉMICA</div>
+            </div>
+            <table style="margin-bottom:10px;">
+              <tr>
+                <td style="width:100px;text-align:center;border:1px solid #999;padding:4px;">
+                  <div class="photo-box">${fotoUrl?`<img src="${fotoUrl}" alt="foto">`:'<span style="color:#ccc;font-size:2rem;">👤</span>'}</div>
+                </td>
+                <td style="border:1px solid #999;padding:8px;">
+                  <table style="border:none;">
+                    <tr><td style="border:none;padding:3px 6px;font-weight:700;">Nombre completo:</td><td style="border:none;padding:3px 6px;">${d.nombre||'—'}</td></tr>
+                    <tr><td style="border:none;padding:3px 6px;font-weight:700;">Unidad(es) de aprendizaje:</td><td style="border:none;padding:3px 6px;">${materiasNom}</td></tr>
+                    <tr><td style="border:none;padding:3px 6px;font-weight:700;">Nivel académico:</td><td style="border:none;padding:3px 6px;">${nivelAcad}</td></tr>
+                  </table>
+                </td>
+              </tr>
+            </table>
+            <table style="margin-bottom:0;">
+              <tr><td ${TH}>Grado Militar:</td><td ${TD}>${d.grado_mil||'Docente Civil'}</td><td ${TH}>Nacionalidad:</td><td ${TD}>Mexicana</td></tr>
+              <tr><td ${TH}>RFC:</td><td ${TD}>${d.rfc||'—'}</td><td ${TH}>Sexo:</td><td ${TD}>${generoLabel}</td></tr>
+              <tr><td ${TH}>Edad:</td><td ${TD}>${edad}</td><td ${TH}>Identificación:</td><td ${TD}>Credencial para Votar No. ${d.credencial_ine||'—'}</td></tr>
+              <tr><td ${TH} colspan="1">Domicilio:</td><td ${TD} colspan="3">${d.domicilio||'—'}</td></tr>
+              <tr><td ${TH}>Tipo de Sangre:</td><td ${TD}>${d.tipo_sangre||'—'}</td><td ${TH}>Procedencia:</td><td ${TD}>${esMilitar?'Militar':'Civil'}</td></tr>
+              <tr><td ${TH}>Programa:</td><td ${TD} colspan="3">${programaNombre}</td></tr>
+            </table>
+            <table style="margin-top:0;">
+              <tr>
+                <th style="border:1px solid #999;padding:5px 8px;width:50%;">Materia 1: ${m1?m1.materia:'—'}</th>
+                <th style="border:1px solid #999;padding:5px 8px;width:50%;">Materia 2: ${m2?m2.materia:'—'}</th>
+              </tr>
+              <tr>${colMateria(m1)}${colMateria(m2)}</tr>
+            </table>
+            <script>window.onload=()=>window.print();<\/script>
+            </body></html>`;
+
+            const win = window.open('','_blank','width=900,height=700');
+            win.document.write(html);
+            win.document.close();
+        } catch(e) { alert('Error generando perfil: ' + e.message); }
+    };
+
+    // ── Generar Hoja de Concepto (imprimible) ──
+    window.generarHojaConcepto = async function(ev) {
+        if (typeof ev === 'string') ev = JSON.parse(ev);
+
+        function chk(field, val) { return field === val ? '(X)' : '( )'; }
+
+        const [docRes, matRes] = await Promise.all([
+            fetch(`/api/docentes/${ev.docente_id}`).then(r=>r.json()).catch(()=>({})),
+            fetch(`/api/materias/${ev.docente_id}`).then(r=>r.json()).catch(()=>[])
+        ]);
+        const d = docRes;
+        const materiasNom = Array.isArray(matRes) ? matRes.map(m=>m.materia).join(', ') : (ev.materias_nombres||'—');
+        const carrera = ev.carrera||'—';
+        const edad = _edadCurp(d.curp);
+        const esMilitar = (ev.condicion||'').toLowerCase().includes('militar');
+        const gradoAcad = {L:'Lic.',M:'Mtría.',D:'Dr.',T:'Tec.',E:'Esp.'}[ev.grado_acad||d.grado_acad]||ev.grado_acad||'';
+
+        const rubH = ev.rubrica_habilidades||'';
+        const rubD = ev.rubrica_dominio||'';
+        const rubT = ev.rubrica_tics||'';
+        const rubV = ev.rubrica_vinculacion||'';
+
+        const concepto_obs = ev.observaciones||'';
+
+        const html = `<!DOCTYPE html><html lang="es"><head><meta charset="UTF-8">
+        <title>Hoja de Concepto — ${ev.docente_nombre}</title>
+        <style>
+          body{font-family:Arial,sans-serif;margin:15mm 12mm;font-size:11px;color:#000;}
+          table{width:100%;border-collapse:collapse;margin-bottom:6px;}
+          td,th{border:1px solid #888;padding:4px 7px;vertical-align:top;}
+          th{background:#ddd;font-weight:700;text-align:center;font-size:0.78rem;}
+          .title{text-align:center;font-weight:900;font-size:1rem;text-transform:uppercase;border:2px solid #000;padding:5px;margin:8px 0;}
+          .section-title{background:#ccc;font-weight:700;text-align:center;padding:3px;text-transform:uppercase;font-size:0.78rem;border:1px solid #888;}
+          .header{display:flex;justify-content:space-between;margin-bottom:6px;font-size:0.73rem;}
+          .firma{display:flex;justify-content:space-between;margin-top:40px;font-size:0.78rem;}
+          .firma div{text-align:center;width:45%;}
+          .firma hr{border-top:1px solid #000;margin-bottom:4px;}
+          @media print{body{margin:8mm;}}
+        </style></head><body>
+        <div class="header">
+          <div>DIR. GRAL. EDUC. MIL. Y<br>RECTORÍA DE LA U.D.E.F.A.</div>
+          <div style="text-align:center;font-weight:700;font-size:0.85rem;">SUBDIR. DE GESTIÓN EDUCATIVA<br>SECC. GESTIÓN DOCENTE.</div>
+        </div>
+        <div class="title">Hoja de Concepto Personal y Académico del Docente</div>
+        <div class="section-title">Datos Personales</div>
+        <table>
+          <tr><td colspan="3"><strong>NOMBRE DEL DOCENTE:</strong> ${ev.docente_nombre||'—'}</td></tr>
+          <tr>
+            <td><strong>DE:</strong> ${edad} AÑOS DE EDAD</td>
+            <td><strong>PROCEDENCIA:</strong> CIVIL ${chk(!esMilitar,'true')} &nbsp; MILITAR ${chk(esMilitar,'true')}</td>
+            <td><strong>CARRERA(S):</strong> ${carrera}</td>
+          </tr>
+          <tr>
+            <td colspan="2"><strong>RFC:</strong> ${ev.rfc||d.rfc||'—'} &nbsp;&nbsp; <strong>CURP:</strong> ${ev.curp||d.curp||'—'}</td>
+            <td><strong>GRADO ACADÉMICO:</strong> ${gradoAcad}</td>
+          </tr>
+        </table>
+        <div class="section-title">Situación / Contratación</div>
+        <table>
+          <tr>
+            <th>SITUACIÓN</th><th>PLANTEL</th><th>PERIODO</th><th>UNIDAD DE APRENDIZAJE</th>
+          </tr>
+          <tr>
+            <td style="text-align:center;">${ev.situacion||'CONTRATADO'}</td>
+            <td>Esc. Mil. de Ingría.</td>
+            <td>${ev.periodo||'—'}</td>
+            <td>${materiasNom}</td>
+          </tr>
+        </table>
+        <div class="section-title">Concepto Personal del Docente</div>
+        <table><tr><td style="min-height:50px;">${ev.concepto_personal||'&nbsp;'}</td></tr></table>
+        <div class="section-title">Concepto Académico — Criterios de Evaluación (Marque con X)</div>
+        <table>
+          <tr>
+            <th style="width:30%;">CRITERIOS</th>
+            <th style="width:35%;">PONDERACIÓN</th>
+            <th style="width:35%;">CONCEPTO GENERAL / OBSERVACIONES</th>
+          </tr>
+          <tr>
+            <td><strong>Habilidades Docentes</strong></td>
+            <td>Excelente ${chk(rubH,'Excelente')} &nbsp; Muy Bien ${chk(rubH,'Muy Bien')} &nbsp; Bien ${chk(rubH,'Bien')} &nbsp; Regular ${chk(rubH,'Regular')} &nbsp; Malo ${chk(rubH,'Malo')}</td>
+            <td rowspan="2" style="vertical-align:top;">${concepto_obs}</td>
+          </tr>
+          <tr>
+            <td><strong>Dominio de la Unidad de Aprendizaje</strong></td>
+            <td>Excelente ${chk(rubD,'Excelente')} &nbsp; Muy Bien ${chk(rubD,'Muy Bien')} &nbsp; Bien ${chk(rubD,'Bien')} &nbsp; Regular ${chk(rubD,'Regular')} &nbsp; Malo ${chk(rubD,'Malo')}</td>
+          </tr>
+          <tr>
+            <td><strong>Empleo de TICS</strong></td>
+            <td>Excelente ${chk(rubT,'Excelente')} &nbsp; Muy Bien ${chk(rubT,'Muy Bien')} &nbsp; Bien ${chk(rubT,'Bien')} &nbsp; Regular ${chk(rubT,'Regular')} &nbsp; Malo ${chk(rubT,'Malo')}</td>
+            <td rowspan="2" style="vertical-align:top;">Puntaje final: <strong>${parseFloat(ev.puntaje_final||0).toFixed(1)}</strong> — ${ev.resultado||'—'}</td>
+          </tr>
+          <tr>
+            <td><strong>Vinculación UA con la Práctica</strong></td>
+            <td>Excelente ${chk(rubV,'Excelente')} &nbsp; Muy Bien ${chk(rubV,'Muy Bien')} &nbsp; Bien ${chk(rubV,'Bien')} &nbsp; Regular ${chk(rubV,'Regular')} &nbsp; Malo ${chk(rubV,'Malo')}</td>
+          </tr>
+        </table>
+        <div class="firma">
+          <div><hr>El Tte. Cor. Zpdrs. Jefe Acc. Sec. Pedagógica</div>
+          <div><hr>El Cap. 1º/o. I.C.I. Jefe Acc. Sección Académica</div>
+        </div>
+        <script>window.onload=()=>window.print();<\/script>
+        </body></html>`;
+
+        const win = window.open('','_blank','width=900,height=700');
+        win.document.write(html);
+        win.document.close();
     };
 
     window.previewCedula = function(input) {
@@ -1163,7 +1394,7 @@ document.addEventListener('DOMContentLoaded', () => {
         const tbody = document.getElementById('evaluaciones-tbody');
         if (!tbody) return;
         try {
-            tbody.innerHTML = "<tr><td colspan='9'>Cargando...</td></tr>";
+            tbody.innerHTML = "<tr><td colspan='7'>Cargando...</td></tr>";
             const res = await fetch('/api/evaluaciones');
             let evals = res.ok ? await res.json() : [];
             if (!Array.isArray(evals)) evals = [];
@@ -1188,21 +1419,20 @@ document.addEventListener('DOMContentLoaded', () => {
                 else if (ev.resultado === 'No Aprobado') badge = 'eval-badge-noaprobado';
                 else if (ev.resultado === 'Observación') badge = 'eval-badge-observacion';
 
+                const rubResumen = [ev.rubrica_habilidades, ev.rubrica_dominio, ev.rubrica_tics, ev.rubrica_vinculacion].filter(Boolean).join(' / ') || '—';
                 tbodyHtml += `
                     <tr>
                         <td style="font-weight:700;">#${ev.evaluacion_id}</td>
                         <td>${ev.docente_nombre} <div style="font-size:0.75rem;color:#888;">${ev.carrera}</div></td>
                         <td>${ev.periodo}</td>
-                        <td style="text-align:center;">${ev.puntaje_desempeno}</td>
-                        <td style="text-align:center;">${ev.puntaje_pedagogia}</td>
-                        <td style="text-align:center;">${ev.puntaje_perfil}</td>
-                        <td style="text-align:center;">${ev.puntaje_responsabilidad}</td>
-                        <td style="text-align:center;font-weight:800;">${ev.puntaje_final}</td>
+                        <td style="text-align:center;font-size:0.78rem;">${rubResumen}</td>
+                        <td style="text-align:center;font-weight:800;">${parseFloat(ev.puntaje_final||0).toFixed(1)}</td>
                         <td><span class="${badge}" style="padding:4px 10px;border-radius:12px;font-size:0.75rem;font-weight:700;">${ev.resultado}</span></td>
+                        <td><button onclick="window.generarHojaConcepto(${JSON.stringify(ev).replace(/"/g,'&quot;')})" style="background:#1e3a5f;color:white;border:none;padding:4px 10px;border-radius:6px;cursor:pointer;font-size:0.72rem;font-weight:700;">&#128196; Hoja</button></td>
                     </tr>
                 `;
             });
-            tbody.innerHTML = tbodyHtml || "<tr><td colspan='9'>No hay evaluaciones registradas.</td></tr>";
+            tbody.innerHTML = tbodyHtml || "<tr><td colspan='7'>No hay evaluaciones registradas.</td></tr>";
 
             // Stats
             document.getElementById('eval-stats').innerHTML = `
@@ -1212,7 +1442,7 @@ document.addEventListener('DOMContentLoaded', () => {
             `;
 
         } catch (e) {
-            tbody.innerHTML = `<tr><td colspan='9' style="color:red">Error: ${e.message}</td></tr>`;
+            tbody.innerHTML = `<tr><td colspan='7' style="color:red">Error: ${e.message}</td></tr>`;
         }
     };
 
@@ -1243,50 +1473,76 @@ document.addEventListener('DOMContentLoaded', () => {
         document.getElementById('modal-eval').classList.add('hidden');
     };
 
+    const _rubricScore = { 'Excelente': 100, 'Muy Bien': 75, 'Bien': 50, 'Regular': 25, 'Malo': 0 };
+    function _rubricVal(name) {
+        const checked = document.querySelector(`input[name="${name}"]:checked`);
+        return checked ? (_rubricScore[checked.value] ?? 0) : null;
+    }
+
     window.updateEvalCalc = function() {
-        const d = parseInt(document.getElementById('eval-desemp').value) || 0;
-        const p = parseInt(document.getElementById('eval-pedag').value) || 0;
-        const f = parseInt(document.getElementById('eval-perfil').value) || 0;
-        const r = parseInt(document.getElementById('eval-resp').value) || 0;
+        const d = _rubricVal('rubrica-habilidades');
+        const p = _rubricVal('rubrica-dominio');
+        const f = _rubricVal('rubrica-tics');
+        const r = _rubricVal('rubrica-vinculacion');
 
-        document.getElementById('eval-val-desemp').textContent = d;
-        document.getElementById('eval-val-pedag').textContent = p;
-        document.getElementById('eval-val-perfil').textContent = f;
-        document.getElementById('eval-val-resp').textContent = r;
+        const LABEL = { 100:'Excelente', 75:'Muy Bien', 50:'Bien', 25:'Regular', 0:'Malo' };
+        document.getElementById('eval-val-desemp').textContent = d !== null ? LABEL[d] : '—';
+        document.getElementById('eval-val-pedag').textContent  = p !== null ? LABEL[p] : '—';
+        document.getElementById('eval-val-perfil').textContent = f !== null ? LABEL[f] : '—';
+        document.getElementById('eval-val-resp').textContent   = r !== null ? LABEL[r] : '—';
 
-        // Weights: 30%, 30%, 20%, 20%
+        if (d === null || p === null || f === null || r === null) {
+            document.getElementById('eval-puntaje-final').textContent = '—';
+            const badge = document.getElementById('eval-resultado-badge');
+            badge.className = 'eval-badge-pendiente';
+            badge.style.cssText = 'display:inline-block;padding:6px 20px;border-radius:20px;font-weight:800;font-size:0.9rem;';
+            badge.textContent = 'Selecciona todos los criterios';
+            return;
+        }
+
         const final = (d * 0.30) + (p * 0.30) + (f * 0.20) + (r * 0.20);
         document.getElementById('eval-puntaje-final').textContent = final.toFixed(2);
 
         const badge = document.getElementById('eval-resultado-badge');
+        badge.style.cssText = 'display:inline-block;padding:6px 20px;border-radius:20px;font-weight:800;font-size:0.9rem;';
         badge.className = '';
-        if (final >= 80) {
-            badge.textContent = 'Aprobado';
-            badge.classList.add('eval-badge-aprobado');
-        } else if (final >= 60) {
-            badge.textContent = 'Observación';
-            badge.classList.add('eval-badge-observacion');
-        } else {
-            badge.textContent = 'No Aprobado';
-            badge.classList.add('eval-badge-noaprobado');
-        }
+        if (final >= 80) { badge.textContent = 'Aprobado'; badge.classList.add('eval-badge-aprobado'); }
+        else if (final >= 60) { badge.textContent = 'Observación'; badge.classList.add('eval-badge-observacion'); }
+        else { badge.textContent = 'No Aprobado'; badge.classList.add('eval-badge-noaprobado'); }
     };
 
     window.guardarEvaluacion = async function() {
         const docId = document.getElementById('eval-docente').value;
         if (!docId) return alert('Debes seleccionar un docente.');
 
+        const rubH = document.querySelector('input[name="rubrica-habilidades"]:checked')?.value || '';
+        const rubD = document.querySelector('input[name="rubrica-dominio"]:checked')?.value || '';
+        const rubT = document.querySelector('input[name="rubrica-tics"]:checked')?.value || '';
+        const rubV = document.querySelector('input[name="rubrica-vinculacion"]:checked')?.value || '';
+        if (!rubH || !rubD || !rubT || !rubV) return alert('Selecciona la ponderación en los 4 criterios académicos.');
+
+        const d = _rubricScore[rubH] ?? 0, p = _rubricScore[rubD] ?? 0;
+        const f = _rubricScore[rubT] ?? 0, r = _rubricScore[rubV] ?? 0;
+        const finalScore = (d * 0.30) + (p * 0.30) + (f * 0.20) + (r * 0.20);
+        const resultado = finalScore >= 80 ? 'Aprobado' : finalScore >= 60 ? 'Observación' : 'No Aprobado';
+
         const payload = {
             docente_id: parseInt(docId),
             evaluador: document.getElementById('eval-evaluador').value,
             periodo: document.getElementById('eval-periodo').value,
-            puntaje_desempeno: parseFloat(document.getElementById('eval-desemp').value),
-            puntaje_pedagogia: parseFloat(document.getElementById('eval-pedag').value),
-            puntaje_perfil: parseFloat(document.getElementById('eval-perfil').value),
-            puntaje_responsabilidad: parseFloat(document.getElementById('eval-resp').value),
-            puntaje_final: parseFloat(document.getElementById('eval-puntaje-final').textContent),
-            resultado: document.getElementById('eval-resultado-badge').textContent,
-            observaciones: document.getElementById('eval-obs').value
+            puntaje_desempeno: d,
+            puntaje_pedagogia: p,
+            puntaje_perfil: f,
+            puntaje_responsabilidad: r,
+            puntaje_final: finalScore,
+            resultado,
+            observaciones: document.getElementById('eval-obs').value,
+            rubrica_habilidades: rubH,
+            rubrica_dominio: rubD,
+            rubrica_tics: rubT,
+            rubrica_vinculacion: rubV,
+            concepto_personal: document.getElementById('eval-concepto-personal').value,
+            situacion: document.getElementById('eval-situacion').value
         };
 
         try {

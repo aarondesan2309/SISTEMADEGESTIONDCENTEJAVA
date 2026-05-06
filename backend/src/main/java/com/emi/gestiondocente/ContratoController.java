@@ -296,58 +296,65 @@ public class ContratoController {
         return baos.toByteArray();
     }
 
-    // ✅ FIX 11: replaceMergeField mejorado.
-    // Problema original: Word fragmenta el XML de los MERGEFIELD en múltiples <w:r>
-    // y
-    // <w:t>; el método anterior fallaba cuando el nombre del campo quedaba partido
-    // entre
-    // tags. Este método busca la secuencia completa fldChar begin → instrText →
-    // separate
-    // → w:t → end y reemplaza TODOS los <w:t> en la zona "display" (entre separate
-    // y end).
+    // Reemplaza un MERGEFIELD de Word en el XML del docx.
+    // Estrategia robusta: itera por bloques fldChar-begin...fldChar-end,
+    // concatena todos los <w:instrText> del bloque (maneja fragmentación de Word)
+    // y si coincide con el campo buscado, reemplaza el bloque completo desde
+    // el <w:r> que contiene el begin hasta el </w:r> que cierra el end.
+    // Produce XML válido: <w:r><w:t xml:space="preserve">valor</w:t></w:r>.
     private String replaceMergeField(String xml, String fieldName, String value) {
-        Pattern fieldPattern = Pattern.compile("MERGEFIELD\\s+" + Pattern.quote(fieldName) + "(?![a-zA-Z0-9_])");
         String valEscaped = escapeXml(value);
+        Pattern instrPat  = Pattern.compile("<w:instrText[^>]*>(.*?)</w:instrText>", Pattern.DOTALL);
+        Pattern fieldPat  = Pattern.compile("(?i)\\bMERGEFIELD\\s+" + Pattern.quote(fieldName) + "(?![\\w])");
         int searchFrom = 0;
-        int replacements = 0;
 
         while (true) {
-            Matcher m = fieldPattern.matcher(xml);
-            if (!m.find(searchFrom)) break;
-            int instrPos = m.start();
+            // Localizar siguiente bloque begin
+            int bPos = xml.indexOf("fldCharType=\"begin\"", searchFrom);
+            if (bPos == -1) break;
 
-            int beginIdx = xml.lastIndexOf("<w:fldChar w:fldCharType=\"begin\"", instrPos);
-            int endIdx = xml.indexOf("w:fldCharType=\"end\"", instrPos);
+            // Localizar el end correspondiente
+            int ePos = xml.indexOf("fldCharType=\"end\"", bPos + 1);
+            if (ePos == -1) break;
 
-            if ("NOMBRE".equals(fieldName)) {
-                System.out.println("[DEBUG NOMBRE] instrPos=" + instrPos + " beginIdx=" + beginIdx + " endIdx=" + endIdx);
-            }
+            // Concatenar todo el instrText del bloque (maneja fragmentación)
+            String segment = xml.substring(bPos, ePos);
+            StringBuilder instr = new StringBuilder();
+            Matcher im = instrPat.matcher(segment);
+            while (im.find()) instr.append(im.group(1));
 
-            if (beginIdx == -1 || endIdx == -1 || beginIdx > endIdx) {
-                if ("NOMBRE".equals(fieldName)) System.out.println("[DEBUG NOMBRE] SKIP: invalid bounds");
-                searchFrom = instrPos + 1;
+            if (!fieldPat.matcher(instr).find()) {
+                searchFrom = ePos + 1;
                 continue;
             }
 
-            int endClose = xml.indexOf(">", endIdx);
-            if (endClose == -1) {
-                searchFrom = instrPos + 1;
-                continue;
+            // Encontrar el <w:r> que CONTIENE el begin fldChar buscando hacia atrás
+            int runStart = -1;
+            int scan = bPos;
+            while (scan > 0) {
+                int rr = Math.max(xml.lastIndexOf("<w:r>", scan - 1),
+                                  xml.lastIndexOf("<w:r ", scan - 1));
+                if (rr < 0) break;
+                // Verificar que no hay </w:r> entre rr y bPos (estaría cerrado antes)
+                if (!xml.substring(rr, bPos).contains("</w:r>")) {
+                    runStart = rr;
+                    break;
+                }
+                scan = rr;
             }
-            int realEnd = endClose + 1;
+            if (runStart == -1) { searchFrom = bPos + 1; continue; }
 
-            if ("NOMBRE".equals(fieldName)) {
-                System.out.println("[DEBUG NOMBRE] replacing [" + beginIdx + ".." + realEnd + "] with value=" + value);
-            }
+            // Encontrar </w:r> que cierra después del end fldChar
+            int runEndClose = xml.indexOf("</w:r>", ePos);
+            if (runEndClose == -1) { searchFrom = bPos + 1; continue; }
+            int runEnd = runEndClose + 6;   // longitud de "</w:r>"
 
-            xml = xml.substring(0, beginIdx) +
-                  "<w:t xml:space=\"preserve\">" + valEscaped + "</w:t>" +
-                  xml.substring(realEnd);
+            xml = xml.substring(0, runStart)
+                    + "<w:r><w:t xml:space=\"preserve\">" + valEscaped + "</w:t></w:r>"
+                    + xml.substring(runEnd);
 
-            replacements++;
-            searchFrom = beginIdx + valEscaped.length();
+            searchFrom = runStart;
         }
-        if ("NOMBRE".equals(fieldName)) System.out.println("[DEBUG NOMBRE] total replacements=" + replacements);
         return xml;
     }
 

@@ -1,5 +1,6 @@
 package com.emi.gestiondocente;
 
+import jakarta.annotation.PostConstruct;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.http.ResponseEntity;
 import org.springframework.jdbc.core.JdbcTemplate;
@@ -18,6 +19,21 @@ public class EvaluacionController {
     @Autowired
     private JdbcTemplate jdbcTemplate;
 
+    @PostConstruct
+    public void initRubricColumns() {
+        String[] cols = {
+            "ALTER TABLE evaluacion ADD COLUMN IF NOT EXISTS rubrica_habilidades VARCHAR(20)",
+            "ALTER TABLE evaluacion ADD COLUMN IF NOT EXISTS rubrica_dominio VARCHAR(20)",
+            "ALTER TABLE evaluacion ADD COLUMN IF NOT EXISTS rubrica_tics VARCHAR(20)",
+            "ALTER TABLE evaluacion ADD COLUMN IF NOT EXISTS rubrica_vinculacion VARCHAR(20)",
+            "ALTER TABLE evaluacion ADD COLUMN IF NOT EXISTS concepto_personal TEXT",
+            "ALTER TABLE evaluacion ADD COLUMN IF NOT EXISTS situacion VARCHAR(30) DEFAULT 'CONTRATADO'"
+        };
+        for (String sql : cols) {
+            try { jdbcTemplate.execute(sql); } catch (Exception ignored) {}
+        }
+    }
+
     // =============================================
     // GET /api/evaluaciones?periodo=...
     // =============================================
@@ -31,19 +47,28 @@ public class EvaluacionController {
 
         String sql = String.format("""
             SELECT e.evaluacion_id, e.docente_id, d.nombre as docente_nombre,
-                   d.condicion, e.evaluador, e.periodo,
+                   d.condicion, d.rfc, d.curp, d.grado_acad, d.grado_mil, d.foto_path,
+                   e.evaluador, e.periodo,
                    to_char(e.fecha_evaluacion, 'YYYY-MM-DD') as fecha_evaluacion,
                    e.puntaje_desempeno, e.puntaje_pedagogia,
                    e.puntaje_perfil, e.puntaje_responsabilidad,
                    e.puntaje_final, e.resultado, e.observaciones,
-                   string_agg(DISTINCT c.siglas, ', ') as carrera
+                   COALESCE(e.rubrica_habilidades,'') as rubrica_habilidades,
+                   COALESCE(e.rubrica_dominio,'') as rubrica_dominio,
+                   COALESCE(e.rubrica_tics,'') as rubrica_tics,
+                   COALESCE(e.rubrica_vinculacion,'') as rubrica_vinculacion,
+                   COALESCE(e.concepto_personal,'') as concepto_personal,
+                   COALESCE(e.situacion,'CONTRATADO') as situacion,
+                   string_agg(DISTINCT c.siglas, ', ') as carrera,
+                   string_agg(DISTINCT m.nombre, ', ') as materias_nombres
             FROM evaluacion e
             JOIN docente d ON e.docente_id = d.docente_id
             LEFT JOIN asignacion a ON d.docente_id = a.docente_id
             LEFT JOIN materia m ON a.materia_id = m.materia_id
             LEFT JOIN carrera c ON m.carrera_id = c.carrera_id
             %s
-            GROUP BY e.evaluacion_id, d.nombre, d.condicion
+            GROUP BY e.evaluacion_id, d.nombre, d.condicion, d.rfc, d.curp,
+                     d.grado_acad, d.grado_mil, d.foto_path
             ORDER BY e.evaluacion_id DESC
             """, whereClause);
 
@@ -86,17 +111,27 @@ public class EvaluacionController {
             BigDecimal pFinal  = dec(payload.get("puntaje_final"));
             String resultado   = str(payload.get("resultado"));
             String obs         = str(payload.get("observaciones"));
+            String rubH        = str(payload.get("rubrica_habilidades"));
+            String rubD        = str(payload.get("rubrica_dominio"));
+            String rubT        = str(payload.get("rubrica_tics"));
+            String rubV        = str(payload.get("rubrica_vinculacion"));
+            String concPers    = str(payload.get("concepto_personal"));
+            String situacion   = str(payload.get("situacion"));
+            if (situacion.isEmpty()) situacion = "CONTRATADO";
 
             Integer newId = jdbcTemplate.queryForObject(
                 """
                 INSERT INTO evaluacion(docente_id, evaluador, periodo,
                     puntaje_desempeno, puntaje_pedagogia, puntaje_perfil,
-                    puntaje_responsabilidad, puntaje_final, resultado, observaciones)
-                VALUES(?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                    puntaje_responsabilidad, puntaje_final, resultado, observaciones,
+                    rubrica_habilidades, rubrica_dominio, rubrica_tics, rubrica_vinculacion,
+                    concepto_personal, situacion)
+                VALUES(?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
                 RETURNING evaluacion_id
                 """,
                 Integer.class,
-                docId, evaluador, periodo, pDesemp, pPedag, pPerfil, pResp, pFinal, resultado, obs
+                docId, evaluador, periodo, pDesemp, pPedag, pPerfil, pResp, pFinal, resultado, obs,
+                rubH, rubD, rubT, rubV, concPers, situacion
             );
 
             // Actualizar estado_evaluacion del docente
@@ -135,6 +170,12 @@ public class EvaluacionController {
             String resultado   = str(payload.get("resultado"));
             String obs         = str(payload.get("observaciones"));
 
+            String rubH2     = str(payload.get("rubrica_habilidades"));
+            String rubD2     = str(payload.get("rubrica_dominio"));
+            String rubT2     = str(payload.get("rubrica_tics"));
+            String rubV2     = str(payload.get("rubrica_vinculacion"));
+            String concPers2 = str(payload.get("concepto_personal"));
+
             jdbcTemplate.update(
                 """
                 UPDATE evaluacion SET
@@ -144,10 +185,16 @@ public class EvaluacionController {
                     puntaje_responsabilidad = ?,
                     puntaje_final = ?,
                     resultado = ?,
-                    observaciones = ?
+                    observaciones = ?,
+                    rubrica_habilidades = ?,
+                    rubrica_dominio = ?,
+                    rubrica_tics = ?,
+                    rubrica_vinculacion = ?,
+                    concepto_personal = ?
                 WHERE evaluacion_id = ?
                 """,
-                pDesemp, pPedag, pPerfil, pResp, pFinal, resultado, obs, id
+                pDesemp, pPedag, pPerfil, pResp, pFinal, resultado, obs,
+                rubH2, rubD2, rubT2, rubV2, concPers2, id
             );
 
             // Actualizar estado del docente

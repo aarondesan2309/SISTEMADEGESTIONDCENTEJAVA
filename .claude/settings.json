@@ -20,7 +20,14 @@
       "Bash(curl -s http://localhost:8091/)",
       "PowerShell(Stop-Process -Id 18052 -Force)",
       "Bash(mvn compile *)",
-      "Bash(./mvnw compile *)"
+      "Bash(./mvnw compile *)",
+      "Bash(git add *)",
+      "Bash(git commit -m ' *)",
+      "Bash(git push *)",
+      "Bash(git commit -m 'fix: fallback en selector de plantel si /api/escuelas no responde *)",
+      "Bash(Get-ChildItem -Path \"c:\\\\temp\\\\gestion-docente-web\" -Recurse -Force)",
+      "Bash(Select-Object -First 50)",
+      "PowerShell(Invoke-WebRequest -Uri \"http://localhost:8091/sgdc-udefa/api/escuelas\" -UseBasicParsing)"
     ]
   }
 }

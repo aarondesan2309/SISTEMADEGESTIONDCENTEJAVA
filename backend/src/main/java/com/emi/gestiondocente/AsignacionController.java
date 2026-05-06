@@ -144,6 +144,16 @@ public class AsignacionController {
             List<Map<String,Object>> existeRows = jdbcTemplate.queryForList(
                 "SELECT 1 FROM asignacion WHERE docente_id = ? AND materia_id = ?", id, materiaId);
             if (existeRows.isEmpty()) {
+                // Verificar límite de 2 materias por docente
+                Integer countActual = jdbcTemplate.queryForObject(
+                    "SELECT COUNT(DISTINCT materia_id) FROM asignacion WHERE docente_id = ?",
+                    Integer.class, id);
+                if (countActual != null && countActual >= 2) {
+                    Map<String, Object> error = new HashMap<>();
+                    error.put("status", "error");
+                    error.put("message", "Límite alcanzado: un docente puede tener máximo 2 materias.");
+                    return ResponseEntity.badRequest().body(error);
+                }
                 jdbcTemplate.update(
                     "INSERT INTO asignacion(docente_id, materia_id, horas, horas_m1, horas_m2, horas_m3, horas_m4, nivel_pago) VALUES(?, ?, ?, ?, ?, ?, ?, ?)",
                     id, materiaId, totalHoras, horasM1, horasM2, horasM3, horasM4, nivelPago);
