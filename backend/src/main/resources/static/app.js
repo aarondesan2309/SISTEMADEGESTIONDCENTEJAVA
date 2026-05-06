@@ -829,7 +829,15 @@ document.addEventListener('DOMContentLoaded', () => {
     window.generarHojaConcepto = async function(ev) {
         if (typeof ev === 'string') ev = JSON.parse(ev);
 
-        function chk(field, val) { return field === val ? '(X)' : '( )'; }
+        function chk(field, val) { return field === val ? '(X)' : '(&nbsp;)'; }
+        function chkGrado(g, tipo) {
+            const gl = (g||'').toLowerCase();
+            if (tipo==='TEC.')  return gl.includes('tec') ? '(X)' : '(&nbsp;)';
+            if (tipo==='LIC.')  return (gl.includes('lic')) ? '(X)' : '(&nbsp;)';
+            if (tipo==='MTRÍA.') return (gl.includes('maest')||gl.includes('mtría')||gl.includes('maestr')) ? '(X)' : '(&nbsp;)';
+            if (tipo==='DR.')   return (gl.includes('doc')||gl.startsWith('dr')) ? '(X)' : '(&nbsp;)';
+            return '(&nbsp;)';
+        }
 
         const [docRes, matRes] = await Promise.all([
             fetch(`/api/docentes/${ev.docente_id}`).then(r=>r.json()).catch(()=>({})),
@@ -837,91 +845,119 @@ document.addEventListener('DOMContentLoaded', () => {
         ]);
         const d = docRes;
         const materiasNom = Array.isArray(matRes) ? matRes.map(m=>m.materia).join(', ') : (ev.materias_nombres||'—');
-        const carrera = ev.carrera||'—';
-        const edad = _edadCurp(d.curp);
-        const esMilitar = (ev.condicion||'').toLowerCase().includes('militar');
-        const gradoAcad = {L:'Lic.',M:'Mtría.',D:'Dr.',T:'Tec.',E:'Esp.'}[ev.grado_acad||d.grado_acad]||ev.grado_acad||'';
-
+        const edad = _edadCurp(d.curp||ev.curp||'');
+        const condicion = d.condicion || ev.condicion || '';
+        const esMilitar = condicion.toLowerCase().includes('militar');
+        const gradoAcad = d.grado_acad || ev.grado_acad || '';
+        const gradoMil  = d.grado_mil  || ev.grado_mil  || '';
         const rubH = ev.rubrica_habilidades||'';
         const rubD = ev.rubrica_dominio||'';
         const rubT = ev.rubrica_tics||'';
         const rubV = ev.rubrica_vinculacion||'';
+        const obs  = ev.observaciones||'';
+        const situacion = (ev.situacion||'CONTRATADO').toUpperCase();
 
-        const concepto_obs = ev.observaciones||'';
+        const OPTS = ['EXCELENTE','MUY BIEN','BIEN','REGULAR','MALO'];
+        function rubricRows(criterio, rubField, obsText, spanObs) {
+            return OPTS.map((opt, i) => `
+              <tr>
+                ${i===0 ? `<td rowspan="5" style="vertical-align:middle;text-align:center;font-weight:700;font-size:0.78rem;">${criterio}</td>` : ''}
+                <td style="text-align:center;">${opt} &nbsp; ${chk(rubField, opt==='MUY BIEN'?'Muy Bien':opt==='EXCELENTE'?'Excelente':opt==='BIEN'?'Bien':opt==='REGULAR'?'Regular':'Malo')}</td>
+                ${i===0 && spanObs ? `<td rowspan="${spanObs}" style="vertical-align:top;font-size:0.82rem;">${obsText}</td>` : ''}
+              </tr>`).join('');
+        }
 
         const html = `<!DOCTYPE html><html lang="es"><head><meta charset="UTF-8">
         <title>Hoja de Concepto — ${ev.docente_nombre}</title>
         <style>
-          body{font-family:Arial,sans-serif;margin:15mm 12mm;font-size:11px;color:#000;}
-          table{width:100%;border-collapse:collapse;margin-bottom:6px;}
-          td,th{border:1px solid #888;padding:4px 7px;vertical-align:top;}
-          th{background:#ddd;font-weight:700;text-align:center;font-size:0.78rem;}
-          .title{text-align:center;font-weight:900;font-size:1rem;text-transform:uppercase;border:2px solid #000;padding:5px;margin:8px 0;}
-          .section-title{background:#ccc;font-weight:700;text-align:center;padding:3px;text-transform:uppercase;font-size:0.78rem;border:1px solid #888;}
-          .header{display:flex;justify-content:space-between;margin-bottom:6px;font-size:0.73rem;}
-          .firma{display:flex;justify-content:space-between;margin-top:40px;font-size:0.78rem;}
-          .firma div{text-align:center;width:45%;}
-          .firma hr{border-top:1px solid #000;margin-bottom:4px;}
-          @media print{body{margin:8mm;}}
+          body{font-family:Arial,sans-serif;margin:12mm 15mm;font-size:10.5px;color:#000;}
+          table{width:100%;border-collapse:collapse;margin-bottom:5px;}
+          td,th{border:1px solid #555;padding:3px 6px;vertical-align:middle;}
+          th{background:#d0d0d0;font-weight:700;text-align:center;font-size:0.78rem;text-transform:uppercase;}
+          .sec{background:#d0d0d0;font-weight:700;text-align:center;padding:3px 6px;text-transform:uppercase;font-size:0.78rem;border:1px solid #555;margin-bottom:0;}
+          .title{text-align:center;font-weight:900;font-size:0.98rem;text-transform:uppercase;border:2px solid #000;padding:4px;margin:6px 0;}
+          .hdr{display:flex;justify-content:space-between;margin-bottom:4px;font-size:0.72rem;font-weight:700;}
+          .firma{display:flex;justify-content:space-between;margin-top:44px;font-size:0.78rem;}
+          .firma div{text-align:center;width:44%;}
+          .firma hr{border-top:1px solid #000;margin-bottom:3px;}
+          @media print{body{margin:8mm 12mm;}@page{size:Letter;margin:10mm 15mm;}}
         </style></head><body>
-        <div class="header">
+        <div class="hdr">
           <div>DIR. GRAL. EDUC. MIL. Y<br>RECTORÍA DE LA U.D.E.F.A.</div>
-          <div style="text-align:center;font-weight:700;font-size:0.85rem;">SUBDIR. DE GESTIÓN EDUCATIVA<br>SECC. GESTIÓN DOCENTE.</div>
+          <div style="text-align:center;">SUBDIR. DE GESTIÓN EDUCATIVA.<br>SECC. GESTIÓN DOCENTE.</div>
         </div>
         <div class="title">Hoja de Concepto Personal y Académico del Docente</div>
-        <div class="section-title">Datos Personales</div>
+
+        <div class="sec">Datos Personales</div>
         <table>
-          <tr><td colspan="3"><strong>NOMBRE DEL DOCENTE:</strong> ${ev.docente_nombre||'—'}</td></tr>
           <tr>
-            <td><strong>DE:</strong> ${edad} AÑOS DE EDAD</td>
-            <td><strong>PROCEDENCIA:</strong> CIVIL ${chk(!esMilitar,'true')} &nbsp; MILITAR ${chk(esMilitar,'true')}</td>
-            <td><strong>CARRERA(S):</strong> ${carrera}</td>
+            <td colspan="4"><strong>NOMBRE DEL DOCENTE:</strong>&nbsp; ${ev.docente_nombre||''}</td>
           </tr>
           <tr>
-            <td colspan="2"><strong>RFC:</strong> ${ev.rfc||d.rfc||'—'} &nbsp;&nbsp; <strong>CURP:</strong> ${ev.curp||d.curp||'—'}</td>
-            <td><strong>GRADO ACADÉMICO:</strong> ${gradoAcad}</td>
+            <td colspan="2"><strong>NATURAL DE:</strong>&nbsp; ${d.natural_de||''}</td>
+            <td colspan="2"><strong>DEL ESTADO DE:</strong>&nbsp; ${d.estado_natural||''}</td>
+          </tr>
+          <tr>
+            <td><strong>DE:</strong>&nbsp; ${edad||'__'} &nbsp;<strong>AÑOS DE EDAD</strong></td>
+            <td><strong>ESTADO CIVIL</strong>&nbsp; ${d.estado_civil||''}</td>
+            <td colspan="2"><strong>PROCEDENCIA:</strong>&nbsp;&nbsp; CIVIL ${chk(esMilitar?'M':'C','C')} &nbsp;&nbsp; MILITAR ${chk(esMilitar?'M':'C','M')}</td>
+          </tr>
+          <tr>
+            <td colspan="2"><strong>ESTUDIOS EN:</strong>&nbsp; ${d.estudios_en||''}</td>
+            <td colspan="2"><strong>GRADO ACADÉMICO:</strong>&nbsp; ${gradoAcad}</td>
+          </tr>
+          <tr>
+            <td colspan="4"><strong>CONTRATADO POR 1/a. VEZ EN:</strong>&nbsp; ${d.fecha_contratacion||''}</td>
+          </tr>
+          <tr>
+            <td colspan="4">
+              <strong>GRADO ACADÉMICO CON EL QUE FUE CONTRATADO:</strong>&nbsp;&nbsp;
+              TEC. ${chkGrado(gradoAcad,'TEC.')} &nbsp;&nbsp;
+              LIC. ${chkGrado(gradoAcad,'LIC.')} &nbsp;&nbsp;
+              MTRÍA. ${chkGrado(gradoAcad,'MTRÍA.')} &nbsp;&nbsp;
+              DR. ${chkGrado(gradoAcad,'DR.')}
+            </td>
           </tr>
         </table>
-        <div class="section-title">Situación / Contratación</div>
+
         <table>
           <tr>
-            <th>SITUACIÓN</th><th>PLANTEL</th><th>PERIODO</th><th>UNIDAD DE APRENDIZAJE</th>
+            <th style="width:18%;">SITUACIÓN</th>
+            <th style="width:22%;">PLANTEL</th>
+            <th style="width:22%;">PERIODO</th>
+            <th style="width:38%;">UNIDAD DE APRENDIZAJE</th>
           </tr>
           <tr>
-            <td style="text-align:center;">${ev.situacion||'CONTRATADO'}</td>
+            <td style="text-align:center;">${situacion}</td>
             <td>Esc. Mil. de Ingría.</td>
-            <td>${ev.periodo||'—'}</td>
+            <td>${ev.periodo||''}</td>
             <td>${materiasNom}</td>
           </tr>
+          <tr><td colspan="4">&nbsp;</td></tr>
         </table>
-        <div class="section-title">Concepto Personal del Docente</div>
-        <table><tr><td style="min-height:50px;">${ev.concepto_personal||'&nbsp;'}</td></tr></table>
-        <div class="section-title">Concepto Académico — Criterios de Evaluación (Marque con X)</div>
+
+        <div class="sec">Faltas Temporales y Sus Causas</div>
+        <table><tr><td style="min-height:20px;">&nbsp;NINGUNA</td></tr></table>
+
+        <div class="sec">Concepto Personal del Docente</div>
+        <table><tr><td style="min-height:40px;">${ev.concepto_personal||'&nbsp;'}</td></tr></table>
+
+        <div class="sec">Concepto Académico</div>
         <table>
           <tr>
-            <th style="width:30%;">CRITERIOS</th>
-            <th style="width:35%;">PONDERACIÓN</th>
-            <th style="width:35%;">CONCEPTO GENERAL / OBSERVACIONES</th>
+            <th colspan="3" style="font-size:0.75rem;">Marque con una "X" la ponderación que más describa al docente</th>
           </tr>
           <tr>
-            <td><strong>Habilidades Docentes</strong></td>
-            <td>Excelente ${chk(rubH,'Excelente')} &nbsp; Muy Bien ${chk(rubH,'Muy Bien')} &nbsp; Bien ${chk(rubH,'Bien')} &nbsp; Regular ${chk(rubH,'Regular')} &nbsp; Malo ${chk(rubH,'Malo')}</td>
-            <td rowspan="2" style="vertical-align:top;">${concepto_obs}</td>
+            <th style="width:28%;">CRITERIOS</th>
+            <th style="width:22%;">PONDERACIÓN</th>
+            <th style="width:50%;">CONCEPTO GENERAL DEL DOCENTE DESDE EL ÁMBITO ACADÉMICO O ALGUNA OBSERVACIONES DE INTERÉS.</th>
           </tr>
-          <tr>
-            <td><strong>Dominio de la Unidad de Aprendizaje</strong></td>
-            <td>Excelente ${chk(rubD,'Excelente')} &nbsp; Muy Bien ${chk(rubD,'Muy Bien')} &nbsp; Bien ${chk(rubD,'Bien')} &nbsp; Regular ${chk(rubD,'Regular')} &nbsp; Malo ${chk(rubD,'Malo')}</td>
-          </tr>
-          <tr>
-            <td><strong>Empleo de TICS</strong></td>
-            <td>Excelente ${chk(rubT,'Excelente')} &nbsp; Muy Bien ${chk(rubT,'Muy Bien')} &nbsp; Bien ${chk(rubT,'Bien')} &nbsp; Regular ${chk(rubT,'Regular')} &nbsp; Malo ${chk(rubT,'Malo')}</td>
-            <td rowspan="2" style="vertical-align:top;">Puntaje final: <strong>${parseFloat(ev.puntaje_final||0).toFixed(1)}</strong> — ${ev.resultado||'—'}</td>
-          </tr>
-          <tr>
-            <td><strong>Vinculación UA con la Práctica</strong></td>
-            <td>Excelente ${chk(rubV,'Excelente')} &nbsp; Muy Bien ${chk(rubV,'Muy Bien')} &nbsp; Bien ${chk(rubV,'Bien')} &nbsp; Regular ${chk(rubV,'Regular')} &nbsp; Malo ${chk(rubV,'Malo')}</td>
-          </tr>
+          ${rubricRows('HABILIDADES DOCENTES', rubH, obs, 10)}
+          ${rubricRows('DOMINIO DE LA UNIDAD DE APRENDIZAJE', rubD, '', 0)}
+          ${rubricRows('EMPLEO DE TICS', rubT, '', 10)}
+          ${rubricRows('VINCULACIÓN DE SU UNIDAD DE APRENDIZAJE CON LA PRÁCTICA', rubV, '', 0)}
         </table>
+
         <div class="firma">
           <div><hr>El Tte. Cor. Zpdrs. Jefe Acc. Sec. Pedagógica</div>
           <div><hr>El Cap. 1º/o. I.C.I. Jefe Acc. Sección Académica</div>
@@ -929,7 +965,7 @@ document.addEventListener('DOMContentLoaded', () => {
         <script>window.onload=()=>window.print();<\/script>
         </body></html>`;
 
-        const win = window.open('','_blank','width=900,height=700');
+        const win = window.open('', '_blank', 'width=920,height=750');
         win.document.write(html);
         win.document.close();
     };
