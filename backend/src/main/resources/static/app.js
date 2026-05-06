@@ -1274,7 +1274,6 @@ document.addEventListener('DOMContentLoaded', () => {
     // EXPEDIENTE DIGITAL - PSO
     // ==========================================
     const DOCS_OBLIGATORIOS = [
-        {id:'solicitud', name:'Solicitud de empleo', type:'Obligatorio'},
         {id:'cv', name:'Currículum Vitae actualizado', type:'Obligatorio'},
         {id:'titulo', name:'Título profesional', type:'Obligatorio'},
         {id:'cedula', name:'Cédula profesional', type:'Obligatorio'},
@@ -1288,8 +1287,7 @@ document.addEventListener('DOMContentLoaded', () => {
         {id:'exp_docente', name:'Constancias de experiencia', type:'Opcional'},
         {id:'cursos', name:'Cursos / Diplomados', type:'Opcional'},
         {id:'clabe', name:'Comprobante bancario', type:'Opcional'},
-        {id:'psicologico', name:'Examen psicológico', type:'Opcional'},
-        {id:'oposicion', name:'Examen de oposición', type:'Opcional'}
+        {id:'psicologico', name:'Examen psicológico', type:'Opcional'}
     ];
 
     window.loadExpediente = async function(docId) {
