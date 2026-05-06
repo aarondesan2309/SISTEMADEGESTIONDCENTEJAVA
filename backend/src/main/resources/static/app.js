@@ -844,7 +844,8 @@ document.addEventListener('DOMContentLoaded', () => {
         document.getElementById('hoja-estudios-en').value       = docRes.estudios_en       || '';
         document.getElementById('hoja-fecha-contratacion').value = docRes.fecha_contratacion || '';
 
-        // Mostrar modal
+        // Mostrar modal con nombre del docente
+        document.getElementById('hoja-docente-nombre').textContent = ev.docente_nombre || '';
         document.getElementById('modal-datos-hoja').classList.remove('hidden');
 
         // Al confirmar, generar el documento
