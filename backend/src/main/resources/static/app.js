@@ -834,6 +834,41 @@ document.addEventListener('DOMContentLoaded', () => {
     window.generarHojaConcepto = async function(ev) {
         if (typeof ev === 'string') ev = JSON.parse(ev);
 
+        // Cargar datos del docente para pre-llenar el modal
+        const docRes = await fetch(`/api/docentes/${ev.docente_id}`).then(r=>r.json()).catch(()=>({}));
+
+        // Pre-llenar modal con los datos guardados
+        document.getElementById('hoja-natural-de').value        = docRes.natural_de        || 'Ciudad de México';
+        document.getElementById('hoja-estado-natural').value    = docRes.estado_natural    || '';
+        document.getElementById('hoja-estado-civil').value      = docRes.estado_civil      || '';
+        document.getElementById('hoja-estudios-en').value       = docRes.estudios_en       || '';
+        document.getElementById('hoja-fecha-contratacion').value = docRes.fecha_contratacion || '';
+
+        // Mostrar modal
+        document.getElementById('modal-datos-hoja').classList.remove('hidden');
+
+        // Al confirmar, generar el documento
+        const btnConfirmar = document.getElementById('btn-confirmar-hoja');
+        const handler = async () => {
+            btnConfirmar.removeEventListener('click', handler);
+            document.getElementById('modal-datos-hoja').classList.add('hidden');
+
+            // Mezclar los valores del modal con el docente
+            const d = {
+                ...docRes,
+                natural_de:         document.getElementById('hoja-natural-de').value,
+                estado_natural:     document.getElementById('hoja-estado-natural').value,
+                estado_civil:       document.getElementById('hoja-estado-civil').value,
+                estudios_en:        document.getElementById('hoja-estudios-en').value,
+                fecha_contratacion: document.getElementById('hoja-fecha-contratacion').value,
+            };
+
+            await _imprimirHojaConcepto(ev, d);
+        };
+        btnConfirmar.addEventListener('click', handler);
+    };
+
+    async function _imprimirHojaConcepto(ev, d) {
         function chk(field, val) { return field === val ? '(X)' : '(&nbsp;)'; }
         function chkGrado(g, tipo) {
             const gl = (g||'').toLowerCase();
@@ -844,17 +879,13 @@ document.addEventListener('DOMContentLoaded', () => {
             return '(&nbsp;)';
         }
 
-        const [docRes, matRes] = await Promise.all([
-            fetch(`/api/docentes/${ev.docente_id}`).then(r=>r.json()).catch(()=>({})),
-            fetch(`/api/materias/${ev.docente_id}`).then(r=>r.json()).catch(()=>[])
-        ]);
-        const d = docRes;
+        const matRes = await fetch(`/api/materias/${ev.docente_id}`).then(r=>r.json()).catch(()=>[]);
+
         const materiasNom = Array.isArray(matRes) ? matRes.map(m=>m.materia).join(', ') : (ev.materias_nombres||'—');
         const edad = _edadCurp(d.curp||ev.curp||'');
         const condicion = d.condicion || ev.condicion || '';
         const esMilitar = condicion.toLowerCase().includes('militar');
         const gradoAcad = d.grado_acad || ev.grado_acad || '';
-        const gradoMil  = d.grado_mil  || ev.grado_mil  || '';
         const rubH = ev.rubrica_habilidades||'';
         const rubD = ev.rubrica_dominio||'';
         const rubT = ev.rubrica_tics||'';
@@ -892,28 +923,23 @@ document.addEventListener('DOMContentLoaded', () => {
           <div style="text-align:center;">SUBDIR. DE GESTIÓN EDUCATIVA.<br>SECC. GESTIÓN DOCENTE.</div>
         </div>
         <div class="title">Hoja de Concepto Personal y Académico del Docente</div>
-
         <div class="sec">Datos Personales</div>
         <table>
-          <tr>
-            <td colspan="4"><strong>NOMBRE DEL DOCENTE:</strong>&nbsp; ${ev.docente_nombre||''}</td>
-          </tr>
+          <tr><td colspan="4"><strong>NOMBRE DEL DOCENTE:</strong>&nbsp; ${ev.docente_nombre||''}</td></tr>
           <tr>
             <td colspan="2"><strong>NATURAL DE:</strong>&nbsp; ${d.natural_de||''}</td>
             <td colspan="2"><strong>DEL ESTADO DE:</strong>&nbsp; ${d.estado_natural||''}</td>
           </tr>
           <tr>
             <td><strong>DE:</strong>&nbsp; ${edad||'__'} &nbsp;<strong>AÑOS DE EDAD</strong></td>
-            <td><strong>ESTADO CIVIL</strong>&nbsp; ${d.estado_civil||''}</td>
+            <td><strong>ESTADO CIVIL:</strong>&nbsp; ${d.estado_civil||''}</td>
             <td colspan="2"><strong>PROCEDENCIA:</strong>&nbsp;&nbsp; CIVIL ${chk(esMilitar?'M':'C','C')} &nbsp;&nbsp; MILITAR ${chk(esMilitar?'M':'C','M')}</td>
           </tr>
           <tr>
             <td colspan="2"><strong>ESTUDIOS EN:</strong>&nbsp; ${d.estudios_en||''}</td>
             <td colspan="2"><strong>GRADO ACADÉMICO:</strong>&nbsp; ${gradoAcad}</td>
           </tr>
-          <tr>
-            <td colspan="4"><strong>CONTRATADO POR 1/a. VEZ EN:</strong>&nbsp; ${d.fecha_contratacion||''}</td>
-          </tr>
+          <tr><td colspan="4"><strong>CONTRATADO POR 1/a. VEZ EN:</strong>&nbsp; ${d.fecha_contratacion||''}</td></tr>
           <tr>
             <td colspan="4">
               <strong>GRADO ACADÉMICO CON EL QUE FUE CONTRATADO:</strong>&nbsp;&nbsp;
@@ -924,13 +950,10 @@ document.addEventListener('DOMContentLoaded', () => {
             </td>
           </tr>
         </table>
-
         <table>
           <tr>
-            <th style="width:18%;">SITUACIÓN</th>
-            <th style="width:22%;">PLANTEL</th>
-            <th style="width:22%;">PERIODO</th>
-            <th style="width:38%;">UNIDAD DE APRENDIZAJE</th>
+            <th style="width:18%;">SITUACIÓN</th><th style="width:22%;">PLANTEL</th>
+            <th style="width:22%;">PERIODO</th><th style="width:38%;">UNIDAD DE APRENDIZAJE</th>
           </tr>
           <tr>
             <td style="text-align:center;">${situacion}</td>
@@ -940,18 +963,13 @@ document.addEventListener('DOMContentLoaded', () => {
           </tr>
           <tr><td colspan="4">&nbsp;</td></tr>
         </table>
-
         <div class="sec">Faltas Temporales y Sus Causas</div>
-        <table><tr><td style="min-height:20px;">&nbsp;NINGUNA</td></tr></table>
-
+        <table><tr><td>&nbsp;NINGUNA</td></tr></table>
         <div class="sec">Concepto Personal del Docente</div>
         <table><tr><td style="min-height:40px;">${ev.concepto_personal||'&nbsp;'}</td></tr></table>
-
         <div class="sec">Concepto Académico</div>
         <table>
-          <tr>
-            <th colspan="3" style="font-size:0.75rem;">Marque con una "X" la ponderación que más describa al docente</th>
-          </tr>
+          <tr><th colspan="3" style="font-size:0.75rem;">Marque con una "X" la ponderación que más describa al docente</th></tr>
           <tr>
             <th style="width:28%;">CRITERIOS</th>
             <th style="width:22%;">PONDERACIÓN</th>
@@ -962,7 +980,6 @@ document.addEventListener('DOMContentLoaded', () => {
           ${rubricRows('EMPLEO DE TICS', rubT, '', 10)}
           ${rubricRows('VINCULACIÓN DE SU UNIDAD DE APRENDIZAJE CON LA PRÁCTICA', rubV, '', 0)}
         </table>
-
         <div class="firma">
           <div><hr>El Tte. Cor. Zpdrs. Jefe Acc. Sec. Pedagógica</div>
           <div><hr>El Cap. 1º/o. I.C.I. Jefe Acc. Sección Académica</div>
@@ -973,7 +990,7 @@ document.addEventListener('DOMContentLoaded', () => {
         const win = window.open('', '_blank', 'width=920,height=750');
         win.document.write(html);
         win.document.close();
-    };
+    }
 
     window.previewCedula = function(input) {
         if (!input.files || !input.files[0]) return;

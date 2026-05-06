@@ -1165,6 +1165,45 @@
                 </div>
             </div>
 
+            <!-- Modal: Datos para Hoja de Concepto -->
+            <div id="modal-datos-hoja" class="hidden" style="position:fixed;top:0;left:0;right:0;bottom:0;background:rgba(10,15,30,0.78);z-index:2100;display:flex;justify-content:center;align-items:center;padding:20px;backdrop-filter:blur(4px);">
+                <div style="background:white;width:100%;max-width:520px;border-radius:20px;overflow:hidden;box-shadow:0 30px 80px rgba(0,0,0,0.35);">
+                    <div style="background:linear-gradient(135deg,#631b2f,#a41c30);padding:20px 28px;display:flex;align-items:center;justify-content:space-between;">
+                        <div>
+                            <div style="color:rgba(255,255,255,0.8);font-size:0.75rem;font-weight:600;letter-spacing:1px;text-transform:uppercase;">Verificar antes de generar</div>
+                            <h3 style="color:white;margin:4px 0 0;font-size:1.1rem;font-weight:800;">Datos para la Hoja de Concepto</h3>
+                        </div>
+                        <button onclick="document.getElementById('modal-datos-hoja').classList.add('hidden')" style="background:rgba(255,255,255,0.1);border:1px solid rgba(255,255,255,0.3);color:white;border-radius:50%;width:34px;height:34px;cursor:pointer;font-size:1.2rem;">&times;</button>
+                    </div>
+                    <div style="padding:24px 28px;display:grid;grid-template-columns:1fr 1fr;gap:14px;">
+                        <div style="grid-column:1/-1;">
+                            <label class="lbl-field">NATURAL DE (CIUDAD)</label>
+                            <input id="hoja-natural-de" style="width:100%;padding:10px 12px;border:1.5px solid #e2e8f0;border-radius:8px;font-size:0.9rem;box-sizing:border-box;">
+                        </div>
+                        <div>
+                            <label class="lbl-field">DEL ESTADO DE</label>
+                            <input id="hoja-estado-natural" style="width:100%;padding:10px 12px;border:1.5px solid #e2e8f0;border-radius:8px;font-size:0.9rem;box-sizing:border-box;">
+                        </div>
+                        <div>
+                            <label class="lbl-field">ESTADO CIVIL</label>
+                            <input id="hoja-estado-civil" placeholder="Soltero / Casado / ..." style="width:100%;padding:10px 12px;border:1.5px solid #e2e8f0;border-radius:8px;font-size:0.9rem;box-sizing:border-box;">
+                        </div>
+                        <div style="grid-column:1/-1;">
+                            <label class="lbl-field">ESTUDIOS EN (INSTITUCIÓN)</label>
+                            <input id="hoja-estudios-en" style="width:100%;padding:10px 12px;border:1.5px solid #e2e8f0;border-radius:8px;font-size:0.9rem;box-sizing:border-box;">
+                        </div>
+                        <div style="grid-column:1/-1;">
+                            <label class="lbl-field">FECHA 1ª CONTRATACIÓN</label>
+                            <input id="hoja-fecha-contratacion" placeholder="Ej: 1 de septiembre 2019" style="width:100%;padding:10px 12px;border:1.5px solid #e2e8f0;border-radius:8px;font-size:0.9rem;box-sizing:border-box;">
+                        </div>
+                        <div style="grid-column:1/-1;display:flex;gap:10px;margin-top:4px;">
+                            <button id="btn-confirmar-hoja" class="btn-action" style="flex:2;">&#128196; Generar Hoja de Concepto</button>
+                            <button onclick="document.getElementById('modal-datos-hoja').classList.add('hidden')" style="flex:1;background:transparent;color:#64748b;border:1.5px solid #e2e8f0;padding:12px;border-radius:12px;cursor:pointer;font-weight:700;font-family:var(--font-main);">Cancelar</button>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
             <!-- View: Vehiculos -->
             <div id="view-vehiculos" class="view-section hidden">
                 <button class="btn-back" onclick="appNavigate('dashboard')">&#8592; Volver al Menu</button>
