@@ -25,11 +25,42 @@ public class DocenteController {
             "ALTER TABLE docente ADD COLUMN IF NOT EXISTS estado_natural VARCHAR(100)",
             "ALTER TABLE docente ADD COLUMN IF NOT EXISTS estado_civil VARCHAR(30)",
             "ALTER TABLE docente ADD COLUMN IF NOT EXISTS estudios_en VARCHAR(255)",
-            "ALTER TABLE docente ADD COLUMN IF NOT EXISTS fecha_contratacion VARCHAR(60)"
+            "ALTER TABLE docente ADD COLUMN IF NOT EXISTS fecha_contratacion VARCHAR(60)",
+            """
+            CREATE TABLE IF NOT EXISTS audit_log (
+                log_id SERIAL PRIMARY KEY,
+                usuario VARCHAR(100),
+                accion VARCHAR(30),
+                entidad VARCHAR(50),
+                entidad_id INT,
+                detalle TEXT,
+                fecha TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+            )
+            """
         };
         for (String sql : cols) {
             try { jdbcTemplate.execute(sql); } catch (Exception ignored) {}
         }
+    }
+
+    private void audit(String usuario, String accion, String entidad, int entidadId, String detalle) {
+        try {
+            jdbcTemplate.update(
+                "INSERT INTO audit_log(usuario, accion, entidad, entidad_id, detalle) VALUES(?,?,?,?,?)",
+                usuario, accion, entidad, entidadId, detalle
+            );
+        } catch (Exception ignored) {}
+    }
+
+    // =============================================
+    // GET /api/audit-log
+    // =============================================
+    @GetMapping("/audit-log")
+    public ResponseEntity<List<Map<String, Object>>> getAuditLog() {
+        List<Map<String, Object>> rows = jdbcTemplate.queryForList(
+            "SELECT log_id, usuario, accion, entidad, entidad_id, detalle, to_char(fecha,'DD/MM/YYYY HH24:MI:SS') as fecha FROM audit_log ORDER BY log_id DESC LIMIT 200"
+        );
+        return ResponseEntity.ok(rows);
     }
 
     // =============================================
@@ -168,7 +199,9 @@ public class DocenteController {
     // POST /api/docentes — Registrar nuevo docente
     // =============================================
     @PostMapping("/docentes")
-    public ResponseEntity<Map<String, Object>> createDocente(@RequestBody Map<String, Object> payload) {
+    public ResponseEntity<Map<String, Object>> createDocente(
+            @RequestBody Map<String, Object> payload,
+            @RequestHeader(value="X-Usuario", defaultValue="sistema") String usuario) {
         String nombre     = str(payload.get("nombre"));
         String rfc        = str(payload.get("rfc"));
         String curp       = str(payload.get("curp"));
@@ -235,6 +268,8 @@ public class DocenteController {
                     docenteId, materiaId);
             }
 
+            audit(usuario, "AGREGAR", "DOCENTE", newId != null ? newId : 0, "Nombre: " + nombre);
+
             Map<String, Object> result = new HashMap<>();
             result.put("status", "ok");
             result.put("docente_id", newId);
@@ -255,7 +290,8 @@ public class DocenteController {
     @PutMapping("/docentes/{id}")
     public ResponseEntity<Map<String, Object>> updateDocente(
             @PathVariable int id,
-            @RequestBody Map<String, Object> payload) {
+            @RequestBody Map<String, Object> payload,
+            @RequestHeader(value="X-Usuario", defaultValue="sistema") String usuario) {
         try {
             jdbcTemplate.update(
                 """
@@ -296,6 +332,8 @@ public class DocenteController {
                 str(payload.get("fecha_contratacion")),
                 id
             );
+            audit(usuario, "MODIFICAR", "DOCENTE", id, "Nombre: " + str(payload.get("nombre")));
+
             Map<String, Object> result = new HashMap<>();
             result.put("status", "ok");
             return ResponseEntity.ok(result);
@@ -312,8 +350,17 @@ public class DocenteController {
     // DELETE /api/docentes/{id} — Eliminar docente
     // =============================================
     @DeleteMapping("/docentes/{id}")
-    public ResponseEntity<Map<String, Object>> deleteDocente(@PathVariable int id) {
+    public ResponseEntity<Map<String, Object>> deleteDocente(
+            @PathVariable int id,
+            @RequestHeader(value="X-Usuario", defaultValue="sistema") String usuario) {
         try {
+            // Guardar nombre antes de eliminar
+            String nombreDocente = "";
+            try {
+                Map<String,Object> d = jdbcTemplate.queryForMap("SELECT nombre FROM docente WHERE docente_id = ?", id);
+                nombreDocente = d.get("nombre").toString();
+            } catch (Exception ignored) {}
+
             jdbcTemplate.update("DELETE FROM expediente_documento WHERE docente_id = ?", id);
             jdbcTemplate.update("DELETE FROM Evaluacion WHERE docente_id = ?", id);
             jdbcTemplate.update("DELETE FROM Vehiculo WHERE docente_id = ?", id);
@@ -322,6 +369,7 @@ public class DocenteController {
             int rows = jdbcTemplate.update("DELETE FROM Docente WHERE docente_id = ?", id);
             Map<String, Object> result = new HashMap<>();
             if (rows > 0) {
+                audit(usuario, "ELIMINAR", "DOCENTE", id, "Nombre: " + nombreDocente);
                 result.put("status", "ok");
                 return ResponseEntity.ok(result);
             } else {

@@ -488,6 +488,31 @@
                         </table>
                     </div>
                 </div>
+
+                <!-- Bitácora de Auditoría (solo ADM) -->
+                <div id="section-auditlog" class="hidden" style="margin-top:32px;">
+                    <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:12px;">
+                        <h3 style="color:var(--color-maroon);font-size:1rem;font-weight:800;text-transform:uppercase;letter-spacing:0.5px;">&#128221; Bitácora de Actividad</h3>
+                        <button onclick="loadAuditLog()" style="background:transparent;color:var(--color-maroon);border:1.5px solid var(--color-maroon);padding:5px 14px;border-radius:8px;cursor:pointer;font-size:0.8rem;font-weight:700;">&#8635; Actualizar</button>
+                    </div>
+                    <div class="glass-card" style="padding:0;overflow:hidden;">
+                        <div style="overflow-x:auto;">
+                            <table style="width:100%;border-collapse:collapse;font-size:0.85rem;">
+                                <thead>
+                                    <tr style="background:#f1f5f9;">
+                                        <th style="padding:10px 14px;text-align:left;font-weight:700;color:#475569;text-transform:uppercase;font-size:0.72rem;letter-spacing:0.5px;">Fecha</th>
+                                        <th style="padding:10px 14px;text-align:left;font-weight:700;color:#475569;text-transform:uppercase;font-size:0.72rem;letter-spacing:0.5px;">Usuario</th>
+                                        <th style="padding:10px 14px;text-align:left;font-weight:700;color:#475569;text-transform:uppercase;font-size:0.72rem;letter-spacing:0.5px;">Acción</th>
+                                        <th style="padding:10px 14px;text-align:left;font-weight:700;color:#475569;text-transform:uppercase;font-size:0.72rem;letter-spacing:0.5px;">Detalle</th>
+                                    </tr>
+                                </thead>
+                                <tbody id="auditlog-tbody">
+                                    <tr><td colspan="4" style="padding:20px;text-align:center;color:#94a3b8;">Cargando...</td></tr>
+                                </tbody>
+                            </table>
+                        </div>
+                    </div>
+                </div>
             </div>
 
             <!-- View: Vehiculos -->
@@ -713,10 +738,13 @@
                             </div>
                         </div>
                         <input type="hidden" id="p-id">
-                        <div style="margin-top:28px;display:flex;gap:12px;">
+                        <div style="margin-top:28px;display:flex;gap:12px;flex-wrap:wrap;">
                             <button type="button" onclick="window.generarPerfilDocente(document.getElementById('p-id').value)" style="flex:1;background:linear-gradient(135deg,#1e3a5f,#2563eb);color:white;border:none;padding:14px;border-radius:12px;cursor:pointer;font-weight:700;font-family:var(--font-main);font-size:0.92rem;">&#128196; Generar Perfil</button>
                             <button id="btn-guardar-perfil" class="btn-action" style="flex:2;" onclick="guardarPerfil()">&#10003; Guardar Cambios</button>
                             <button onclick="cerrarPerfil()" style="flex:1;background:transparent;color:#64748b;border:1.5px solid #e2e8f0;padding:14px;border-radius:12px;cursor:pointer;font-weight:700;font-family:var(--font-main);transition:all 0.2s;" onmouseover="this.style.background='#f8fafc'" onmouseout="this.style.background='transparent'">Cerrar</button>
+                        </div>
+                        <div id="btn-eliminar-docente-row" style="margin-top:10px;display:none;">
+                            <button onclick="eliminarDocenteActual()" style="width:100%;padding:12px;background:transparent;color:#dc2626;border:1.5px solid #dc2626;border-radius:12px;cursor:pointer;font-weight:700;font-family:var(--font-main);font-size:0.88rem;transition:all 0.2s;" onmouseover="this.style.background='#fef2f2'" onmouseout="this.style.background='transparent'">&#128465; Eliminar Docente</button>
                         </div>
                     </div>
 

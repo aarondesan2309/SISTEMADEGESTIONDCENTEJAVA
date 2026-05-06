@@ -189,7 +189,6 @@ document.addEventListener('DOMContentLoaded', () => {
 
         const btnAdd = document.getElementById('btn-add-docente');
         if (btnAdd) {
-            // Only Career chiefs (or ADM) can add teachers
             if (['ICI','ICE','II','IC','TC', 'ADM'].includes(currentUser.role)) {
                 btnAdd.classList.remove('hidden');
             } else {
@@ -197,7 +196,21 @@ document.addEventListener('DOMContentLoaded', () => {
             }
         }
 
-        // Fetch real data from Postgres via PowerShell server
+        // Bitácora solo ADM
+        const secAudit = document.getElementById('section-auditlog');
+        if (secAudit) {
+            if (currentUser.role === 'ADM') {
+                secAudit.classList.remove('hidden');
+                loadAuditLog();
+            } else {
+                secAudit.classList.add('hidden');
+            }
+        }
+
+        // Botón eliminar solo ADM
+        const rowElim = document.getElementById('btn-eliminar-docente-row');
+        if (rowElim) rowElim.style.display = currentUser.role === 'ADM' ? 'block' : 'none';
+
         loadDocentesFromDatabase();
         loadVehiculosFromDatabase();
     }
@@ -619,6 +632,10 @@ document.addEventListener('DOMContentLoaded', () => {
             loadEvalHistorial(id);
             // Default to first tab
             switchPerfilTab('datos');
+
+            // Mostrar botón eliminar solo para ADM
+            const rowElim = document.getElementById('btn-eliminar-docente-row');
+            if (rowElim) rowElim.style.display = currentUser?.role === 'ADM' ? 'block' : 'none';
 
             document.getElementById('modal-perfil').classList.remove('hidden');
         } catch(e) {
@@ -1096,7 +1113,7 @@ document.addEventListener('DOMContentLoaded', () => {
             // 1. Guardar datos del perfil
             const res = await fetch(`/api/docentes/${id}`, {
                 method: 'PUT',
-                headers: {'Content-Type': 'application/json'},
+                headers: {'Content-Type': 'application/json', 'X-Usuario': currentUser?.name || 'sistema'},
                 body: JSON.stringify(data)
             });
             if (!res.ok) throw new Error('Error al guardar datos');
@@ -1210,7 +1227,7 @@ document.addEventListener('DOMContentLoaded', () => {
 
                 const res = await fetch('/api/docentes', {
                     method: 'POST',
-                    headers: { 'Content-Type': 'application/json' },
+                    headers: { 'Content-Type': 'application/json', 'X-Usuario': currentUser?.name || 'sistema' },
                     body: JSON.stringify(payload)
                 });
 
@@ -2899,6 +2916,61 @@ document.addEventListener('DOMContentLoaded', () => {
             }
         } catch(e) {
             alert('Error de conexión');
+        }
+    };
+
+    // ==========================================
+    // ELIMINAR DOCENTE
+    // ==========================================
+    window.eliminarDocenteActual = async function() {
+        const id = document.getElementById('p-id').value;
+        const nombre = document.getElementById('p-nombre').value || 'este docente';
+        if (!confirm(`¿Estás seguro de eliminar a "${nombre}"?\n\nEsta acción eliminará también sus asignaciones, evaluaciones, contratos y expediente. No se puede deshacer.`)) return;
+        try {
+            const res = await fetch(`/api/docentes/${id}`, {
+                method: 'DELETE',
+                headers: { 'X-Usuario': currentUser?.name || 'sistema' }
+            });
+            const data = await res.json();
+            if (data.status === 'ok') {
+                alert(`Docente "${nombre}" eliminado correctamente.`);
+                cerrarPerfil();
+                loadDocentesFromDatabase();
+                if (currentUser.role === 'ADM') loadAuditLog();
+            } else {
+                alert('Error: ' + (data.message || 'No se pudo eliminar'));
+            }
+        } catch(e) {
+            alert('Error de conexión: ' + e.message);
+        }
+    };
+
+    // ==========================================
+    // BITÁCORA DE AUDITORÍA
+    // ==========================================
+    window.loadAuditLog = async function() {
+        const tbody = document.getElementById('auditlog-tbody');
+        if (!tbody) return;
+        tbody.innerHTML = '<tr><td colspan="4" style="padding:20px;text-align:center;color:#94a3b8;">Cargando...</td></tr>';
+        try {
+            const res = await fetch('/api/audit-log');
+            const rows = await res.json();
+            if (!rows.length) {
+                tbody.innerHTML = '<tr><td colspan="4" style="padding:20px;text-align:center;color:#94a3b8;">Sin registros aún.</td></tr>';
+                return;
+            }
+            const ACCION_COLOR = { 'AGREGAR': '#16a34a', 'MODIFICAR': '#2563eb', 'ELIMINAR': '#dc2626' };
+            tbody.innerHTML = rows.map(r => `
+                <tr style="border-bottom:1px solid #f1f5f9;transition:background .15s;" onmouseover="this.style.background='#f8fafc'" onmouseout="this.style.background=''">
+                    <td style="padding:10px 14px;color:#64748b;font-size:0.82rem;white-space:nowrap;">${r.fecha||''}</td>
+                    <td style="padding:10px 14px;font-weight:700;color:#1e293b;">${r.usuario||''}</td>
+                    <td style="padding:10px 14px;">
+                        <span style="background:${ACCION_COLOR[r.accion]||'#64748b'}18;color:${ACCION_COLOR[r.accion]||'#64748b'};padding:3px 10px;border-radius:20px;font-size:0.78rem;font-weight:700;">${r.accion||''}</span>
+                    </td>
+                    <td style="padding:10px 14px;color:#475569;">${r.detalle||''}</td>
+                </tr>`).join('');
+        } catch(e) {
+            tbody.innerHTML = '<tr><td colspan="4" style="padding:20px;text-align:center;color:#ef4444;">Error al cargar bitácora.</td></tr>';
         }
     };
 
