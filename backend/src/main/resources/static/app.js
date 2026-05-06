@@ -724,7 +724,13 @@ document.addEventListener('DOMContentLoaded', () => {
         }
     };
 
+    let _semTenantOverride = false;
+
     window.cerrarDirResumen = function() {
+        if (_semTenantOverride) {
+            localStorage.removeItem('sgdc_tenant');
+            _semTenantOverride = false;
+        }
         document.getElementById('modal-dir-resumen').classList.add('hidden');
     };
 
@@ -2253,7 +2259,7 @@ document.addEventListener('DOMContentLoaded', () => {
         const countEl = document.getElementById('sem-docentes-global-count');
         const escuelaFilter = document.getElementById('sem-docentes-escuela-filter');
         if (!tbody) return;
-        tbody.innerHTML = '<tr><td colspan="6" style="color:rgba(255,255,255,0.4);padding:20px;text-align:center;">Cargando...</td></tr>';
+        tbody.innerHTML = '<tr><td colspan="7" style="color:rgba(255,255,255,0.4);padding:20px;text-align:center;">Cargando...</td></tr>';
         try {
             const res = await fetch('/api/docentes-global');
             _docentesGlobalData = await res.json();
@@ -2265,7 +2271,7 @@ document.addEventListener('DOMContentLoaded', () => {
 
             filtrarDocentesGlobal();
         } catch(e) {
-            tbody.innerHTML = '<tr><td colspan="6" style="color:#f87171;padding:20px;text-align:center;">Error al cargar docentes.</td></tr>';
+            tbody.innerHTML = '<tr><td colspan="7" style="color:#f87171;padding:20px;text-align:center;">Error al cargar docentes.</td></tr>';
         }
     };
 
@@ -2287,7 +2293,7 @@ document.addEventListener('DOMContentLoaded', () => {
         if (countEl) countEl.textContent = `${filtrados.length} docente(s) encontrado(s) de ${_docentesGlobalData.length} en total`;
 
         if (!filtrados.length) {
-            tbody.innerHTML = '<tr><td colspan="6" style="color:rgba(255,255,255,0.4);padding:20px;text-align:center;">Sin resultados.</td></tr>';
+            tbody.innerHTML = '<tr><td colspan="7" style="color:rgba(255,255,255,0.4);padding:20px;text-align:center;">Sin resultados.</td></tr>';
             return;
         }
 
@@ -2301,8 +2307,17 @@ document.addEventListener('DOMContentLoaded', () => {
                 <td style="padding:10px 12px;color:rgba(255,255,255,0.75);">${d.grado_mil || '—'}</td>
                 <td style="padding:10px 12px;color:rgba(255,255,255,0.75);">${d.condicion || '—'}</td>
                 <td style="padding:10px 12px;"><span style="color:${color};font-weight:700;font-size:0.82rem;">${d.estado_evaluacion || 'SIN CONCEPTO'}</span></td>
+                <td style="padding:10px 12px;text-align:center;">
+                    <button onclick="window.verPerfilSEM('${d.database}',${d.docente_id})" style="background:linear-gradient(135deg,#7f1d1d,#991b1b);border:none;color:white;padding:5px 14px;border-radius:7px;cursor:pointer;font-size:0.78rem;font-weight:700;">Ver</button>
+                </td>
             </tr>`;
         }).join('');
+    };
+
+    window.verPerfilSEM = function(database, id) {
+        _semTenantOverride = true;
+        localStorage.setItem('sgdc_tenant', database);
+        window.verPerfilDir(id, '');
     };
 
     async function loadSemQuickUsers() {
