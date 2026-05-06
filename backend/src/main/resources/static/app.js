@@ -96,6 +96,7 @@ document.addEventListener('DOMContentLoaded', () => {
                 document.getElementById('admin-sem-panel').classList.remove('auth-hidden');
                 document.getElementById('admin-sem-logged-user').textContent = username + ' · SEM';
                 loadAdminEscuelas();
+                loadDocentesGlobal();
             } else if (res.ok && data.status === 'ok') {
                 errEl.textContent = 'Acceso denegado. Se requiere rol SEM.';
                 errEl.style.display = 'block';
@@ -686,7 +687,7 @@ document.addEventListener('DOMContentLoaded', () => {
                 document.getElementById('dr-eval-fecha').textContent = lastEval.fecha_evaluacion ? 'Fecha: ' + lastEval.fecha_evaluacion : '';
             } else {
                 document.getElementById('dr-eval-score').textContent = '—';
-                document.getElementById('dr-eval-fecha').textContent = 'Sin evaluación registrada';
+                document.getElementById('dr-eval-fecha').textContent = 'Sin hoja de concepto registrada';
             }
 
             // Expediente — conteo de documentos subidos
@@ -1432,7 +1433,7 @@ document.addEventListener('DOMContentLoaded', () => {
                     </tr>
                 `;
             });
-            tbody.innerHTML = tbodyHtml || "<tr><td colspan='7'>No hay evaluaciones registradas.</td></tr>";
+            tbody.innerHTML = tbodyHtml || "<tr><td colspan='7'>No hay hojas de concepto registradas.</td></tr>";
 
             // Stats
             document.getElementById('eval-stats').innerHTML = `
@@ -1555,17 +1556,17 @@ document.addEventListener('DOMContentLoaded', () => {
                 body: JSON.stringify(payload)
             });
 
-            if (!res.ok) throw new Error('Error al registrar evaluación');
-            
-            alert('Evaluación guardada exitosamente');
+            if (!res.ok) throw new Error('Error al registrar hoja de concepto');
+
+            alert('Hoja de concepto guardada exitosamente');
             closeEvalModal();
             loadEvaluacionesFromDatabase();
-            loadDocentesFromDatabase(); // refresca los badges en el main
+            loadDocentesFromDatabase();
 
         } catch(e) {
             alert(e.message);
         } finally {
-            event.target.disabled = false; event.target.textContent = '✓ Registrar Evaluación';
+            event.target.disabled = false; event.target.textContent = '✓ Registrar Hoja de Concepto';
         }
     };
 
@@ -1578,7 +1579,7 @@ document.addEventListener('DOMContentLoaded', () => {
             if (!Array.isArray(evals)) evals = [];
 
             if (evals.length === 0) {
-                container.innerHTML = '<em>No hay evaluaciones registradas para este docente.</em>';
+                container.innerHTML = '<em>No hay hojas de concepto registradas para este docente.</em>';
                 return;
             }
 
@@ -2162,6 +2163,68 @@ document.addEventListener('DOMContentLoaded', () => {
             }
         }
     }
+
+    // ==========================================
+    // SEM — Padrón Global de Docentes
+    // ==========================================
+    let _docentesGlobalData = [];
+
+    window.loadDocentesGlobal = async function() {
+        const tbody = document.getElementById('sem-docentes-global-tbody');
+        const countEl = document.getElementById('sem-docentes-global-count');
+        const escuelaFilter = document.getElementById('sem-docentes-escuela-filter');
+        if (!tbody) return;
+        tbody.innerHTML = '<tr><td colspan="6" style="color:rgba(255,255,255,0.4);padding:20px;text-align:center;">Cargando...</td></tr>';
+        try {
+            const res = await fetch('/api/docentes-global');
+            _docentesGlobalData = await res.json();
+
+            // Llenar selector de planteles
+            const planteles = [...new Set(_docentesGlobalData.map(d => d.plantel))].sort();
+            escuelaFilter.innerHTML = '<option value="">Todos los planteles</option>' +
+                planteles.map(p => `<option value="${p}">${p}</option>`).join('');
+
+            filtrarDocentesGlobal();
+        } catch(e) {
+            tbody.innerHTML = '<tr><td colspan="6" style="color:#f87171;padding:20px;text-align:center;">Error al cargar docentes.</td></tr>';
+        }
+    };
+
+    window.filtrarDocentesGlobal = function() {
+        const tbody = document.getElementById('sem-docentes-global-tbody');
+        const countEl = document.getElementById('sem-docentes-global-count');
+        const search = (document.getElementById('sem-docentes-search')?.value || '').toLowerCase();
+        const plantelFil = document.getElementById('sem-docentes-escuela-filter')?.value || '';
+
+        const filtrados = _docentesGlobalData.filter(d => {
+            const matchPlantel = !plantelFil || d.plantel === plantelFil;
+            const matchSearch = !search ||
+                d.nombre.toLowerCase().includes(search) ||
+                d.grado_acad.toLowerCase().includes(search) ||
+                d.condicion.toLowerCase().includes(search);
+            return matchPlantel && matchSearch;
+        });
+
+        if (countEl) countEl.textContent = `${filtrados.length} docente(s) encontrado(s) de ${_docentesGlobalData.length} en total`;
+
+        if (!filtrados.length) {
+            tbody.innerHTML = '<tr><td colspan="6" style="color:rgba(255,255,255,0.4);padding:20px;text-align:center;">Sin resultados.</td></tr>';
+            return;
+        }
+
+        const CONCEPTO_COLOR = { 'APTO': '#4ade80', 'NO APTO': '#f87171', 'CONTRATADO': '#93c5fd', '': '#94a3b8' };
+        tbody.innerHTML = filtrados.map(d => {
+            const color = CONCEPTO_COLOR[d.estado_evaluacion?.toUpperCase()] || '#94a3b8';
+            return `<tr style="border-bottom:1px solid rgba(255,255,255,0.05);transition:background .15s;" onmouseover="this.style.background='rgba(255,255,255,0.04)'" onmouseout="this.style.background=''">
+                <td style="padding:10px 12px;color:#93c5fd;font-weight:700;">${d.plantel}</td>
+                <td style="padding:10px 12px;color:white;font-weight:600;">${d.nombre}</td>
+                <td style="padding:10px 12px;color:rgba(255,255,255,0.75);">${d.grado_acad || '—'}</td>
+                <td style="padding:10px 12px;color:rgba(255,255,255,0.75);">${d.grado_mil || '—'}</td>
+                <td style="padding:10px 12px;color:rgba(255,255,255,0.75);">${d.condicion || '—'}</td>
+                <td style="padding:10px 12px;"><span style="color:${color};font-weight:700;font-size:0.82rem;">${d.estado_evaluacion || 'SIN CONCEPTO'}</span></td>
+            </tr>`;
+        }).join('');
+    };
 
     async function loadSemQuickUsers() {
         const listEl = document.getElementById('sem-quick-list');

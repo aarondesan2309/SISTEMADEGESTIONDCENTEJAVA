@@ -261,6 +261,51 @@ public class EscuelaController {
     }
 
     /**
+     * GET /api/docentes-global — Todos los docentes de todas las escuelas
+     */
+    @GetMapping("/docentes-global")
+    public ResponseEntity<List<Map<String, Object>>> getDocentesGlobal(
+            @RequestParam(defaultValue = "localhost") String dbHost,
+            @RequestParam(defaultValue = "5432") String dbPort) {
+        List<Map<String, Object>> todos = new ArrayList<>();
+        try {
+            List<Map<String, Object>> dbs = jdbcTemplate.queryForList(
+                "SELECT datname FROM pg_database WHERE datname LIKE 'gestion_docente_%' ORDER BY datname"
+            );
+            for (Map<String, Object> db : dbs) {
+                String dbname = db.get("datname").toString();
+                String plantel = dbname.replace("gestion_docente_", "").toUpperCase();
+                String url = String.format("jdbc:postgresql://%s:%s/%s", dbHost, dbPort, dbname);
+                try (java.sql.Connection conn = DriverManager.getConnection(url, dbUser, dbPass)) {
+                    java.sql.Statement stmt = conn.createStatement();
+                    var rs = stmt.executeQuery(
+                        "SELECT docente_id, nombre, COALESCE(grado_acad,'') as grado_acad, " +
+                        "COALESCE(grado_mil,'') as grado_mil, COALESCE(condicion,'') as condicion, " +
+                        "COALESCE(estado_evaluacion,'') as estado_evaluacion FROM docente ORDER BY nombre"
+                    );
+                    while (rs.next()) {
+                        Map<String, Object> row = new HashMap<>();
+                        row.put("plantel", plantel);
+                        row.put("database", dbname);
+                        row.put("docente_id", rs.getInt("docente_id"));
+                        row.put("nombre", rs.getString("nombre"));
+                        row.put("grado_acad", rs.getString("grado_acad"));
+                        row.put("grado_mil", rs.getString("grado_mil"));
+                        row.put("condicion", rs.getString("condicion"));
+                        row.put("estado_evaluacion", rs.getString("estado_evaluacion"));
+                        todos.add(row);
+                    }
+                    rs.close();
+                    stmt.close();
+                } catch (Exception ignored) {}
+            }
+        } catch (Exception e) {
+            e.printStackTrace();
+        }
+        return ResponseEntity.ok(todos);
+    }
+
+    /**
      * GET /api/escuelas — Lista las bases de datos de escuelas configuradas
      */
     @GetMapping("/escuelas")
