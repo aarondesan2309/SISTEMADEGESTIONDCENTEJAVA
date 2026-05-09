@@ -257,24 +257,22 @@
                 </div>
             </div>
 
-            <!-- Vista Global de Docentes -->
-            <div style="background:rgba(255,255,255,0.03); backdrop-filter:blur(20px); border:1px solid rgba(255,255,255,0.08); border-radius:24px; padding:32px; margin-top:32px; box-shadow:0 15px 35px rgba(0,0,0,0.2);">
+            <!-- Docentes por plantel (se despliega al hacer clic en Ver Docentes) -->
+            <div id="sem-docentes-plantel-section" style="display:none; background:rgba(255,255,255,0.03); backdrop-filter:blur(20px); border:1px solid rgba(255,255,255,0.08); border-radius:24px; padding:32px; margin-top:32px; box-shadow:0 15px 35px rgba(0,0,0,0.2);">
                 <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:20px; flex-wrap:wrap; gap:12px;">
-                    <h3 style="color:white; font-size:1.2rem; font-weight:800; letter-spacing:1px; margin:0; display:flex; align-items:center; gap:10px;"><span style="font-size:1.4rem;">👥</span> Padrón Global de Docentes</h3>
+                    <h3 style="color:white; font-size:1.2rem; font-weight:800; letter-spacing:1px; margin:0; display:flex; align-items:center; gap:10px;">
+                        <span style="font-size:1.4rem;">👥</span> Docentes &mdash; <span id="sem-docentes-plantel-nombre" style="color:#93c5fd;"></span>
+                    </h3>
                     <div style="display:flex;gap:10px;align-items:center;flex-wrap:wrap;">
-                        <input id="sem-docentes-search" type="text" placeholder="Buscar docente..." oninput="filtrarDocentesGlobal()" style="padding:8px 14px;border-radius:10px;border:1px solid rgba(255,255,255,0.2);background:rgba(255,255,255,0.08);color:white;font-size:0.88rem;width:200px;" />
-                        <select id="sem-docentes-escuela-filter" onchange="filtrarDocentesGlobal()" style="padding:8px 14px;border-radius:10px;border:1px solid rgba(255,255,255,0.2);background:rgba(30,58,138,0.6);color:white;font-size:0.88rem;">
-                            <option value="">Todos los planteles</option>
-                        </select>
-                        <button onclick="loadDocentesGlobal()" style="background:rgba(255,255,255,0.1);border:1px solid rgba(255,255,255,0.2);color:white;padding:8px 16px;border-radius:10px;cursor:pointer;font-size:0.85rem;font-weight:700;">&#8635; Actualizar</button>
+                        <input id="sem-docentes-plantel-search" type="text" placeholder="Buscar docente..." oninput="filtrarDocentesPlantel()" style="padding:8px 14px;border-radius:10px;border:1px solid rgba(255,255,255,0.2);background:rgba(255,255,255,0.08);color:white;font-size:0.88rem;width:200px;" />
+                        <button onclick="cerrarDocentesPlantel()" style="background:rgba(255,255,255,0.1);border:1px solid rgba(255,255,255,0.2);color:white;padding:8px 16px;border-radius:10px;cursor:pointer;font-size:0.85rem;font-weight:700;">&larr; Cerrar</button>
                     </div>
                 </div>
-                <div id="sem-docentes-global-count" style="color:rgba(255,255,255,0.6);font-size:0.82rem;margin-bottom:14px;"></div>
+                <div id="sem-docentes-plantel-count" style="color:rgba(255,255,255,0.6);font-size:0.82rem;margin-bottom:14px;"></div>
                 <div style="overflow-x:auto;">
                     <table style="width:100%;border-collapse:collapse;font-size:0.88rem;">
                         <thead>
                             <tr style="color:rgba(255,255,255,0.5);text-transform:uppercase;font-size:0.75rem;letter-spacing:1px;border-bottom:1px solid rgba(255,255,255,0.1);">
-                                <th style="padding:10px 12px;text-align:left;">Plantel</th>
                                 <th style="padding:10px 12px;text-align:left;">Nombre</th>
                                 <th style="padding:10px 12px;text-align:left;">Grado Acad.</th>
                                 <th style="padding:10px 12px;text-align:left;">Grado Mil.</th>
@@ -283,8 +281,8 @@
                                 <th style="padding:10px 12px;text-align:center;">Perfil</th>
                             </tr>
                         </thead>
-                        <tbody id="sem-docentes-global-tbody">
-                            <tr><td colspan="7" style="color:rgba(255,255,255,0.4);padding:20px;text-align:center;">Cargando...</td></tr>
+                        <tbody id="sem-docentes-plantel-tbody">
+                            <tr><td colspan="6" style="color:rgba(255,255,255,0.4);padding:20px;text-align:center;">Seleccione un plantel.</td></tr>
                         </tbody>
                     </table>
                 </div>

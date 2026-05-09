@@ -96,7 +96,6 @@ document.addEventListener('DOMContentLoaded', () => {
                 document.getElementById('admin-sem-panel').classList.remove('auth-hidden');
                 document.getElementById('admin-sem-logged-user').textContent = username + ' · SEM';
                 loadAdminEscuelas();
-                loadDocentesGlobal();
             } else if (res.ok && data.status === 'ok') {
                 errEl.textContent = 'Acceso denegado. Se requiere rol SEM.';
                 errEl.style.display = 'block';
@@ -725,10 +724,15 @@ document.addEventListener('DOMContentLoaded', () => {
     };
 
     let _semTenantOverride = false;
+    let _semCurrentPlantelDb = null;
 
     window.cerrarDirResumen = function() {
         if (_semTenantOverride) {
-            localStorage.removeItem('sgdc_tenant');
+            if (_semCurrentPlantelDb) {
+                localStorage.setItem('sgdc_tenant', _semCurrentPlantelDb);
+            } else {
+                localStorage.removeItem('sgdc_tenant');
+            }
             _semTenantOverride = false;
         }
         document.getElementById('modal-dir-resumen').classList.add('hidden');
@@ -2320,6 +2324,72 @@ document.addEventListener('DOMContentLoaded', () => {
         window.verPerfilDir(id, '');
     };
 
+    let _docentesPlantelData = [];
+
+    window.verDocentesPlantel = async function(database, siglas) {
+        _semCurrentPlantelDb = database;
+        localStorage.setItem('sgdc_tenant', database);
+
+        document.getElementById('sem-docentes-plantel-nombre').textContent = siglas;
+        const section = document.getElementById('sem-docentes-plantel-section');
+        section.style.display = 'block';
+        section.scrollIntoView({ behavior: 'smooth', block: 'start' });
+
+        const tbody = document.getElementById('sem-docentes-plantel-tbody');
+        tbody.innerHTML = '<tr><td colspan="6" style="color:rgba(255,255,255,0.4);padding:20px;text-align:center;">Cargando...</td></tr>';
+
+        try {
+            const res = await fetch('/api/docentes');
+            _docentesPlantelData = await res.json();
+            filtrarDocentesPlantel();
+        } catch(e) {
+            tbody.innerHTML = '<tr><td colspan="6" style="color:#f87171;padding:20px;text-align:center;">Error al cargar docentes.</td></tr>';
+        }
+    };
+
+    window.filtrarDocentesPlantel = function() {
+        const tbody = document.getElementById('sem-docentes-plantel-tbody');
+        const countEl = document.getElementById('sem-docentes-plantel-count');
+        const search = (document.getElementById('sem-docentes-plantel-search')?.value || '').toLowerCase();
+
+        const filtrados = _docentesPlantelData.filter(d =>
+            !search ||
+            (d.nombre || '').toLowerCase().includes(search) ||
+            (d.grado_acad || '').toLowerCase().includes(search) ||
+            (d.condicion || '').toLowerCase().includes(search)
+        );
+
+        if (countEl) countEl.textContent = `${filtrados.length} docente(s)`;
+
+        if (!filtrados.length) {
+            tbody.innerHTML = '<tr><td colspan="6" style="color:rgba(255,255,255,0.4);padding:20px;text-align:center;">Sin resultados.</td></tr>';
+            return;
+        }
+
+        const CONCEPTO_COLOR = { 'APTO': '#4ade80', 'NO APTO': '#f87171', 'CONTRATADO': '#93c5fd', '': '#94a3b8' };
+        tbody.innerHTML = filtrados.map(d => {
+            const color = CONCEPTO_COLOR[(d.estado_evaluacion || '').toUpperCase()] || '#94a3b8';
+            return `<tr style="border-bottom:1px solid rgba(255,255,255,0.05);" onmouseover="this.style.background='rgba(255,255,255,0.04)'" onmouseout="this.style.background=''">
+                <td style="padding:10px 12px;color:white;font-weight:600;">${d.nombre}</td>
+                <td style="padding:10px 12px;color:rgba(255,255,255,0.75);">${d.grado_acad || '—'}</td>
+                <td style="padding:10px 12px;color:rgba(255,255,255,0.75);">${d.grado_mil || '—'}</td>
+                <td style="padding:10px 12px;color:rgba(255,255,255,0.75);">${d.condicion || '—'}</td>
+                <td style="padding:10px 12px;"><span style="color:${color};font-weight:700;font-size:0.82rem;">${d.estado_evaluacion || 'SIN CONCEPTO'}</span></td>
+                <td style="padding:10px 12px;text-align:center;">
+                    <button onclick="window.verPerfilSEM('${_semCurrentPlantelDb}',${d.docente_id})" style="background:linear-gradient(135deg,#7f1d1d,#991b1b);border:none;color:white;padding:5px 14px;border-radius:7px;cursor:pointer;font-size:0.78rem;font-weight:700;">Ver</button>
+                </td>
+            </tr>`;
+        }).join('');
+    };
+
+    window.cerrarDocentesPlantel = function() {
+        _semCurrentPlantelDb = null;
+        _docentesPlantelData = [];
+        localStorage.removeItem('sgdc_tenant');
+        document.getElementById('sem-docentes-plantel-section').style.display = 'none';
+        document.getElementById('sem-docentes-plantel-search').value = '';
+    };
+
     async function loadSemQuickUsers() {
         const listEl = document.getElementById('sem-quick-list');
         if (!listEl) return;
@@ -2421,8 +2491,9 @@ document.addEventListener('DOMContentLoaded', () => {
                             <div style="color:white;font-weight:900;font-size:1.15rem;font-family:var(--font-display);letter-spacing:0.5px;">${siglas}${statusBadge}</div>
                             <div style="color:rgba(255,255,255,0.45);font-size:0.72rem;margin-top:2px;font-family:monospace;">${d.database}</div>
                         </div>
-                        <div style="display:flex;gap:8px;align-items:center;">
+                        <div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap;justify-content:flex-end;">
                             ${isUnconf ? '' : `<span style="background:rgba(255,255,255,0.1);color:rgba(255,255,255,0.8);padding:4px 10px;border-radius:20px;font-size:0.72rem;font-weight:700;">${docentes} doc.</span>`}
+                            ${!isUnconf ? `<button id="sem-btn-doc-${siglas}" style="background:rgba(99,27,47,0.85);color:white;border:none;padding:6px 14px;border-radius:8px;cursor:pointer;font-size:0.78rem;font-weight:800;white-space:nowrap;">&#128065; Docentes</button>` : ''}
                             <button id="${btnId}" style="${btnStyle}border:none;padding:6px 14px;border-radius:8px;cursor:pointer;font-size:0.8rem;font-weight:800;white-space:nowrap;">${btnLabel}</button>
                         </div>
                     </div>
@@ -2445,6 +2516,10 @@ document.addEventListener('DOMContentLoaded', () => {
                     } else {
                         btn.onclick = () => { window.semAbrirGestionPlantel(d.database); };
                     }
+                }
+                const btnDoc = card.querySelector(`#sem-btn-doc-${siglas}`);
+                if (btnDoc) {
+                    btnDoc.onclick = () => { window.verDocentesPlantel(d.database, siglas); };
                 }
             });
         } catch(e) {
