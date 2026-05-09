@@ -2394,12 +2394,15 @@ document.addEventListener('DOMContentLoaded', () => {
         if (totalPages > 1) {
             html += `<tr><td colspan="6" style="padding:14px 12px;text-align:center;">
                 <div style="display:inline-flex;gap:8px;align-items:center;">
-                    <button onclick="_docentesPlantelPage=Math.max(1,_docentesPlantelPage-1);filtrarDocentesPlantel()" ${_docentesPlantelPage===1?'disabled':''} style="background:rgba(255,255,255,0.1);border:1px solid rgba(255,255,255,0.2);color:white;padding:5px 14px;border-radius:7px;cursor:pointer;font-size:0.82rem;">&#8592; Anterior</button>
+                    <button onclick="window.semPagAnterior()" ${_docentesPlantelPage===1?'disabled':''} style="background:rgba(255,255,255,0.1);border:1px solid rgba(255,255,255,0.2);color:white;padding:5px 14px;border-radius:7px;cursor:pointer;font-size:0.82rem;">&#8592; Anterior</button>
                     <span style="color:rgba(255,255,255,0.7);font-size:0.82rem;font-weight:700;">${_docentesPlantelPage} / ${totalPages}</span>
-                    <button onclick="_docentesPlantelPage=Math.min(${totalPages},_docentesPlantelPage+1);filtrarDocentesPlantel()" ${_docentesPlantelPage===totalPages?'disabled':''} style="background:rgba(255,255,255,0.1);border:1px solid rgba(255,255,255,0.2);color:white;padding:5px 14px;border-radius:7px;cursor:pointer;font-size:0.82rem;">Siguiente &#8594;</button>
+                    <button onclick="window.semPagSiguiente(${totalPages})" ${_docentesPlantelPage===totalPages?'disabled':''} style="background:rgba(255,255,255,0.1);border:1px solid rgba(255,255,255,0.2);color:white;padding:5px 14px;border-radius:7px;cursor:pointer;font-size:0.82rem;">Siguiente &#8594;</button>
                 </div>
             </td></tr>`;
         }
+
+        window.semPagAnterior = function() { _docentesPlantelPage = Math.max(1, _docentesPlantelPage - 1); filtrarDocentesPlantel(); };
+        window.semPagSiguiente = function(total) { _docentesPlantelPage = Math.min(total, _docentesPlantelPage + 1); filtrarDocentesPlantel(); };
 
         tbody.innerHTML = html;
     };
@@ -2555,20 +2558,19 @@ document.addEventListener('DOMContentLoaded', () => {
         const form = document.getElementById('form-nuevo-plantel');
         const btn = document.getElementById('btn-toggle-form-plantel');
         if (!form || !btn) return;
-        
-        if (form.style.display === 'none') {
+        const isHidden = form.style.display !== 'block';
+        if (isHidden) {
             form.style.display = 'block';
-            btn.innerHTML = '&minus; Ocultar';
+            btn.textContent = '− Ocultar';
         } else {
             form.style.display = 'none';
-            btn.innerHTML = '+ Expandir';
-            // Clear fields on close
+            btn.textContent = '+ Expandir Menú';
             ['np-siglas','np-ciclo','np-nombre','np-dbname','np-dbpass'].forEach(id => {
                 const el = document.getElementById(id); if (el) el.value = '';
             });
-            document.getElementById('np-usuarios-rows').innerHTML = '';
+            const ur = document.getElementById('np-usuarios-rows'); if (ur) ur.innerHTML = '';
             document.querySelectorAll('#np-carreras-checks input').forEach(c => c.checked = false);
-            document.getElementById('np-result-msg').innerHTML = '';
+            const rm = document.getElementById('np-result-msg'); if (rm) rm.innerHTML = '';
         }
     };
 
