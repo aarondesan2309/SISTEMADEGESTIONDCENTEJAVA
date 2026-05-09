@@ -2325,6 +2325,8 @@ document.addEventListener('DOMContentLoaded', () => {
     };
 
     let _docentesPlantelData = [];
+    let _docentesPlantelPage = 1;
+    const _DOCENTES_PER_PAGE = 20;
 
     window.verDocentesPlantel = async function(database, siglas) {
         _semCurrentPlantelDb = database;
@@ -2341,13 +2343,15 @@ document.addEventListener('DOMContentLoaded', () => {
         try {
             const res = await fetch('/api/docentes');
             _docentesPlantelData = await res.json();
+            _docentesPlantelPage = 1;
             filtrarDocentesPlantel();
         } catch(e) {
             tbody.innerHTML = '<tr><td colspan="6" style="color:#f87171;padding:20px;text-align:center;">Error al cargar docentes.</td></tr>';
         }
     };
 
-    window.filtrarDocentesPlantel = function() {
+    window.filtrarDocentesPlantel = function(resetPage) {
+        if (resetPage) _docentesPlantelPage = 1;
         const tbody = document.getElementById('sem-docentes-plantel-tbody');
         const countEl = document.getElementById('sem-docentes-plantel-count');
         const search = (document.getElementById('sem-docentes-plantel-search')?.value || '').toLowerCase();
@@ -2359,15 +2363,21 @@ document.addEventListener('DOMContentLoaded', () => {
             (d.condicion || '').toLowerCase().includes(search)
         );
 
-        if (countEl) countEl.textContent = `${filtrados.length} docente(s)`;
-
         if (!filtrados.length) {
+            if (countEl) countEl.textContent = '0 docente(s)';
             tbody.innerHTML = '<tr><td colspan="6" style="color:rgba(255,255,255,0.4);padding:20px;text-align:center;">Sin resultados.</td></tr>';
             return;
         }
 
+        const totalPages = Math.ceil(filtrados.length / _DOCENTES_PER_PAGE);
+        if (_docentesPlantelPage > totalPages) _docentesPlantelPage = totalPages;
+        const start = (_docentesPlantelPage - 1) * _DOCENTES_PER_PAGE;
+        const pagina = filtrados.slice(start, start + _DOCENTES_PER_PAGE);
+
+        if (countEl) countEl.textContent = `${filtrados.length} docente(s) — Página ${_docentesPlantelPage} de ${totalPages}`;
+
         const CONCEPTO_COLOR = { 'APTO': '#4ade80', 'NO APTO': '#f87171', 'CONTRATADO': '#93c5fd', '': '#94a3b8' };
-        tbody.innerHTML = filtrados.map(d => {
+        let html = pagina.map(d => {
             const color = CONCEPTO_COLOR[(d.estado_evaluacion || '').toUpperCase()] || '#94a3b8';
             return `<tr style="border-bottom:1px solid rgba(255,255,255,0.05);" onmouseover="this.style.background='rgba(255,255,255,0.04)'" onmouseout="this.style.background=''">
                 <td style="padding:10px 12px;color:white;font-weight:600;">${d.nombre}</td>
@@ -2380,14 +2390,28 @@ document.addEventListener('DOMContentLoaded', () => {
                 </td>
             </tr>`;
         }).join('');
+
+        if (totalPages > 1) {
+            html += `<tr><td colspan="6" style="padding:14px 12px;text-align:center;">
+                <div style="display:inline-flex;gap:8px;align-items:center;">
+                    <button onclick="_docentesPlantelPage=Math.max(1,_docentesPlantelPage-1);filtrarDocentesPlantel()" ${_docentesPlantelPage===1?'disabled':''} style="background:rgba(255,255,255,0.1);border:1px solid rgba(255,255,255,0.2);color:white;padding:5px 14px;border-radius:7px;cursor:pointer;font-size:0.82rem;">&#8592; Anterior</button>
+                    <span style="color:rgba(255,255,255,0.7);font-size:0.82rem;font-weight:700;">${_docentesPlantelPage} / ${totalPages}</span>
+                    <button onclick="_docentesPlantelPage=Math.min(${totalPages},_docentesPlantelPage+1);filtrarDocentesPlantel()" ${_docentesPlantelPage===totalPages?'disabled':''} style="background:rgba(255,255,255,0.1);border:1px solid rgba(255,255,255,0.2);color:white;padding:5px 14px;border-radius:7px;cursor:pointer;font-size:0.82rem;">Siguiente &#8594;</button>
+                </div>
+            </td></tr>`;
+        }
+
+        tbody.innerHTML = html;
     };
 
     window.cerrarDocentesPlantel = function() {
         _semCurrentPlantelDb = null;
         _docentesPlantelData = [];
+        _docentesPlantelPage = 1;
         localStorage.removeItem('sgdc_tenant');
         document.getElementById('sem-docentes-plantel-section').style.display = 'none';
         document.getElementById('sem-docentes-plantel-search').value = '';
+        document.getElementById('admin-escuelas-lista').scrollIntoView({ behavior: 'smooth', block: 'start' });
     };
 
     async function loadSemQuickUsers() {
@@ -2539,12 +2563,9 @@ document.addEventListener('DOMContentLoaded', () => {
             form.style.display = 'none';
             btn.innerHTML = '+ Expandir';
             // Clear fields on close
-            document.getElementById('np-siglas').value = '';
-            document.getElementById('np-ciclo').value = '';
-            document.getElementById('np-nombre').value = '';
-            document.getElementById('np-director').value = '';
-            document.getElementById('np-dbname').value = '';
-            document.getElementById('np-dbpass').value = '';
+            ['np-siglas','np-ciclo','np-nombre','np-dbname','np-dbpass'].forEach(id => {
+                const el = document.getElementById(id); if (el) el.value = '';
+            });
             document.getElementById('np-usuarios-rows').innerHTML = '';
             document.querySelectorAll('#np-carreras-checks input').forEach(c => c.checked = false);
             document.getElementById('np-result-msg').innerHTML = '';
