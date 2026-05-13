@@ -72,6 +72,9 @@
             <plugin>
                 <groupId>org.springframework.boot</groupId>
                 <artifactId>spring-boot-maven-plugin</artifactId>
+                <configuration>
+                    <mainClass>com.emi.gestiondocente.GestionDocenteApplication</mainClass>
+                </configuration>
             </plugin>
         </plugins>
     </build>

@@ -6,6 +6,7 @@ import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.web.bind.annotation.*;
 
 import java.math.BigDecimal;
+import java.math.RoundingMode;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
@@ -48,14 +49,14 @@ public class AsignacionController {
                 if (horasM4.compareTo(BigDecimal.ZERO) < 0) horasM4 = BigDecimal.ZERO;
                 totalHoras = horasM1.add(horasM2).add(horasM3).add(horasM4);
             } else {
-                // Modo simple: distribución equitativa entre los 4 meses
+                // Modo simple: dividir el total entre los 4 meses del semestre
                 totalHoras = new BigDecimal(payload.getOrDefault("horas", "0").toString());
                 if (totalHoras.compareTo(BigDecimal.ZERO) < 0) totalHoras = BigDecimal.ZERO;
-                // Distribuir: cada mes recibe el mismo total (son horas TOTALES del semestre por mes)
-                horasM1 = totalHoras;
-                horasM2 = totalHoras;
-                horasM3 = totalHoras;
-                horasM4 = totalHoras;
+                BigDecimal porMes = totalHoras.divide(new BigDecimal("4"), 2, RoundingMode.HALF_UP);
+                horasM1 = porMes;
+                horasM2 = porMes;
+                horasM3 = porMes;
+                horasM4 = porMes;
             }
 
             jdbcTemplate.update(
@@ -109,13 +110,14 @@ public class AsignacionController {
                 if (horasM4.compareTo(BigDecimal.ZERO) < 0) horasM4 = BigDecimal.ZERO;
                 totalHoras = horasM1.add(horasM2).add(horasM3).add(horasM4);
             } else {
-                // Modo simple: horas por mes (iguales en cada uno)
+                // Modo simple: dividir el total entre los 4 meses del semestre
                 totalHoras = new BigDecimal(payload.getOrDefault("horas", "0").toString());
                 if (totalHoras.compareTo(BigDecimal.ZERO) < 0) totalHoras = BigDecimal.ZERO;
-                horasM1 = totalHoras;
-                horasM2 = totalHoras;
-                horasM3 = totalHoras;
-                horasM4 = totalHoras;
+                BigDecimal porMes = totalHoras.divide(new BigDecimal("4"), 2, RoundingMode.HALF_UP);
+                horasM1 = porMes;
+                horasM2 = porMes;
+                horasM3 = porMes;
+                horasM4 = porMes;
             }
 
             // Buscar carrera (con parámetro)

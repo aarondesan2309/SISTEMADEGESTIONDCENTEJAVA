@@ -27,7 +27,8 @@ public class EvaluacionController {
             "ALTER TABLE evaluacion ADD COLUMN IF NOT EXISTS rubrica_tics VARCHAR(20)",
             "ALTER TABLE evaluacion ADD COLUMN IF NOT EXISTS rubrica_vinculacion VARCHAR(20)",
             "ALTER TABLE evaluacion ADD COLUMN IF NOT EXISTS concepto_personal TEXT",
-            "ALTER TABLE evaluacion ADD COLUMN IF NOT EXISTS situacion VARCHAR(30) DEFAULT 'CONTRATADO'"
+            "ALTER TABLE evaluacion ADD COLUMN IF NOT EXISTS situacion VARCHAR(30) DEFAULT 'CONTRATADO'",
+            "ALTER TABLE evaluacion ADD COLUMN IF NOT EXISTS unidad_aprendizaje VARCHAR(200)"
         };
         for (String sql : cols) {
             try { jdbcTemplate.execute(sql); } catch (Exception ignored) {}
@@ -59,6 +60,7 @@ public class EvaluacionController {
                    COALESCE(e.rubrica_vinculacion,'') as rubrica_vinculacion,
                    COALESCE(e.concepto_personal,'') as concepto_personal,
                    COALESCE(e.situacion,'CONTRATADO') as situacion,
+                   COALESCE(e.unidad_aprendizaje,'') as unidad_aprendizaje,
                    string_agg(DISTINCT c.siglas, ', ') as carrera,
                    string_agg(DISTINCT m.nombre, ', ') as materias_nombres
             FROM evaluacion e
@@ -86,7 +88,8 @@ public class EvaluacionController {
                    to_char(fecha_evaluacion, 'YYYY-MM-DD') as fecha_evaluacion,
                    puntaje_desempeno, puntaje_pedagogia,
                    puntaje_perfil, puntaje_responsabilidad,
-                   puntaje_final, resultado, observaciones
+                   puntaje_final, resultado, observaciones,
+                   COALESCE(unidad_aprendizaje,'') as unidad_aprendizaje
             FROM evaluacion
             WHERE docente_id = ?
             ORDER BY fecha_evaluacion DESC
@@ -117,6 +120,7 @@ public class EvaluacionController {
             String rubV        = str(payload.get("rubrica_vinculacion"));
             String concPers    = str(payload.get("concepto_personal"));
             String situacion   = str(payload.get("situacion"));
+            String unidadAp    = str(payload.get("unidad_aprendizaje"));
             if (situacion.isEmpty()) situacion = "CONTRATADO";
 
             Integer newId = jdbcTemplate.queryForObject(
@@ -125,13 +129,13 @@ public class EvaluacionController {
                     puntaje_desempeno, puntaje_pedagogia, puntaje_perfil,
                     puntaje_responsabilidad, puntaje_final, resultado, observaciones,
                     rubrica_habilidades, rubrica_dominio, rubrica_tics, rubrica_vinculacion,
-                    concepto_personal, situacion)
-                VALUES(?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                    concepto_personal, situacion, unidad_aprendizaje)
+                VALUES(?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
                 RETURNING evaluacion_id
                 """,
                 Integer.class,
                 docId, evaluador, periodo, pDesemp, pPedag, pPerfil, pResp, pFinal, resultado, obs,
-                rubH, rubD, rubT, rubV, concPers, situacion
+                rubH, rubD, rubT, rubV, concPers, situacion, unidadAp
             );
 
             // Actualizar estado_evaluacion del docente
@@ -175,6 +179,7 @@ public class EvaluacionController {
             String rubT2     = str(payload.get("rubrica_tics"));
             String rubV2     = str(payload.get("rubrica_vinculacion"));
             String concPers2 = str(payload.get("concepto_personal"));
+            String unidadAp2 = str(payload.get("unidad_aprendizaje"));
 
             jdbcTemplate.update(
                 """
@@ -190,11 +195,12 @@ public class EvaluacionController {
                     rubrica_dominio = ?,
                     rubrica_tics = ?,
                     rubrica_vinculacion = ?,
-                    concepto_personal = ?
+                    concepto_personal = ?,
+                    unidad_aprendizaje = ?
                 WHERE evaluacion_id = ?
                 """,
                 pDesemp, pPedag, pPerfil, pResp, pFinal, resultado, obs,
-                rubH2, rubD2, rubT2, rubV2, concPers2, id
+                rubH2, rubD2, rubT2, rubV2, concPers2, unidadAp2, id
             );
 
             // Actualizar estado del docente
@@ -219,6 +225,29 @@ public class EvaluacionController {
             error.put("status", "error");
             error.put("message", e.getMessage());
             return ResponseEntity.internalServerError().body(error);
+        }
+    }
+
+    // =============================================
+    // DELETE /api/evaluaciones/{id}
+    // =============================================
+    @DeleteMapping("/evaluaciones/{id}")
+    public ResponseEntity<Map<String, Object>> deleteEvaluacion(@PathVariable int id) {
+        Map<String, Object> result = new HashMap<>();
+        try {
+            int rows = jdbcTemplate.update("DELETE FROM evaluacion WHERE evaluacion_id = ?", id);
+            if (rows == 0) {
+                result.put("status", "error");
+                result.put("message", "Evaluación no encontrada");
+                return ResponseEntity.status(404).body(result);
+            }
+            result.put("status", "ok");
+            return ResponseEntity.ok(result);
+        } catch (Exception e) {
+            e.printStackTrace();
+            result.put("status", "error");
+            result.put("message", e.getMessage());
+            return ResponseEntity.internalServerError().body(result);
         }
     }
 

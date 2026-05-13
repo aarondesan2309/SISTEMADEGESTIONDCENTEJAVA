@@ -21,7 +21,9 @@ public class VehiculoController {
     // GET /api/vehiculos
     // =============================================
     @GetMapping("/vehiculos")
-    public ResponseEntity<List<Map<String, Object>>> getVehiculos(@RequestParam(required = false) String role) {
+    public ResponseEntity<List<Map<String, Object>>> getVehiculos(
+            @RequestParam(required = false) String role,
+            @RequestParam(name = "docente_id", required = false) Integer docenteId) {
         String sql = """
             SELECT v.vehiculo_id,
                    d.docente_id,
@@ -40,7 +42,9 @@ public class VehiculoController {
             JOIN Docente d ON v.docente_id = d.docente_id
             """;
 
-        if (role != null && !role.equalsIgnoreCase("ADM") && !role.equalsIgnoreCase("DIR") && !role.equalsIgnoreCase("SEM") && !role.equalsIgnoreCase("JSA")) {
+        if (docenteId != null) {
+            sql += " WHERE v.docente_id = " + docenteId;
+        } else if (role != null && !role.equalsIgnoreCase("ADM") && !role.equalsIgnoreCase("DIR") && !role.equalsIgnoreCase("SEM") && !role.equalsIgnoreCase("JSA")) {
             sql += " WHERE EXISTS (SELECT 1 FROM Asignacion a JOIN Materia m ON a.materia_id = m.materia_id JOIN Carrera c ON m.carrera_id = c.carrera_id WHERE a.docente_id = d.docente_id AND c.siglas = '" + role.replace("'", "''") + "') ";
         }
 

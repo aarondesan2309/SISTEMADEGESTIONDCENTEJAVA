@@ -4,7 +4,7 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>S.E.M. | Sistema de Gestion Docente - EMI</title>
-    <link rel="stylesheet" href="index.css?v=2026.5">
+    <link rel="stylesheet" href="index.css?v=2026.6">
     <style>
         .auth-hidden { display: none !important; }
         .landing-wrapper {
@@ -41,6 +41,7 @@
         .login-card {
             background: #ffffff; width: 100%; max-width: 450px; padding: 40px;
             border-radius: 12px; box-shadow: 0 10px 40px rgba(0,0,0,0.5); text-align: center;
+            max-height: 90vh; overflow-y: auto;
         }
         .login-card h2 { color: var(--color-maroon); font-size: 1.1rem; margin-bottom: 8px; font-weight: 800; }
         .login-card h4 { color: #666; margin-bottom: 24px; }
@@ -110,7 +111,7 @@
                 <!-- Acceso rápido por rol (para pruebas) -->
                 <div id="quick-roles-panel" style="margin-bottom:14px;">
                     <p style="font-size:0.72rem;color:#94a3b8;margin-bottom:6px;text-align:left;font-weight:700;text-transform:uppercase;letter-spacing:0.5px;">Acceso rápido — Usuarios del sistema</p>
-                    <div id="quick-roles-list" style="display:flex;flex-wrap:wrap;gap:5px;min-height:24px;">
+                    <div id="quick-roles-list" style="display:flex;flex-wrap:wrap;gap:5px;min-height:24px;max-height:100px;overflow-y:auto;">
                         <span style="font-size:0.78rem;color:#94a3b8;">Cargando...</span>
                     </div>
                     <p style="font-size:0.7rem;color:#94a3b8;margin-top:5px;">Click rellena usuario y contraseña automáticamente.</p>
@@ -194,7 +195,10 @@
                         <span style="background:rgba(255,255,255,0.2); padding:8px; border-radius:12px; font-size:1.2rem;">⚡</span>
                         <h3 style="color:white; font-size:1.1rem; margin:0; font-weight:800; letter-spacing:0.5px;">DESPLEGAR NUEVO PLANTEL</h3>
                     </div>
-                    <button onclick="toggleFormNuevoPlantel()" id="btn-toggle-form-plantel" style="background:rgba(255,255,255,0.15); border:1px solid rgba(255,255,255,0.3); color:white; padding:8px 20px; border-radius:10px; cursor:pointer; font-size:0.85rem; font-weight:700; transition:all 0.2s;" onmouseover="this.style.background='rgba(255,255,255,0.25)'" onmouseout="this.style.background='rgba(255,255,255,0.15)'">+ Expandir Menú</button>
+                    <div style="display:flex;gap:8px;align-items:center;">
+                        <button onclick="npLimpiarFormPlantel()" style="background:rgba(255,255,255,0.1); border:1px solid rgba(255,255,255,0.25); color:white; padding:8px 16px; border-radius:10px; cursor:pointer; font-size:0.82rem; font-weight:700; transition:all 0.2s;" onmouseover="this.style.background='rgba(255,255,255,0.2)'" onmouseout="this.style.background='rgba(255,255,255,0.1)'">&#10005; Limpiar</button>
+                        <button onclick="toggleFormNuevoPlantel()" id="btn-toggle-form-plantel" style="background:rgba(255,255,255,0.15); border:1px solid rgba(255,255,255,0.3); color:white; padding:8px 20px; border-radius:10px; cursor:pointer; font-size:0.85rem; font-weight:700; transition:all 0.2s;" onmouseover="this.style.background='rgba(255,255,255,0.25)'" onmouseout="this.style.background='rgba(255,255,255,0.15)'">+ Expandir Menú</button>
+                    </div>
                 </div>
                 <div id="form-nuevo-plantel" style="padding:32px; display:none; background:#f8fafc;">
                     <div style="display:grid;grid-template-columns:1fr 1fr;gap:16px;">
@@ -215,14 +219,6 @@
                     <div style="margin-top:18px;">
                         <label class="lbl-field">CARRERAS ACADÉMICAS</label>
                         <div style="display:flex;flex-wrap:wrap;gap:8px;margin-top:8px;" id="np-carreras-checks">
-                            <label style="display:flex;align-items:center;gap:5px;padding:6px 12px;border:1.5px solid #e2e8f0;border-radius:20px;cursor:pointer;font-size:0.82rem;font-weight:600;"><input type="checkbox" value="ICI"> ICI — Computación e Informática</label>
-                            <label style="display:flex;align-items:center;gap:5px;padding:6px 12px;border:1.5px solid #e2e8f0;border-radius:20px;cursor:pointer;font-size:0.82rem;font-weight:600;"><input type="checkbox" value="ICE"> ICE — Comunicaciones y Electrónica</label>
-                            <label style="display:flex;align-items:center;gap:5px;padding:6px 12px;border:1.5px solid #e2e8f0;border-radius:20px;cursor:pointer;font-size:0.82rem;font-weight:600;"><input type="checkbox" value="II"> II — Ingeniería Industrial</label>
-                            <label style="display:flex;align-items:center;gap:5px;padding:6px 12px;border:1.5px solid #e2e8f0;border-radius:20px;cursor:pointer;font-size:0.82rem;font-weight:600;"><input type="checkbox" value="IC"> IC — Construcción Militar</label>
-                            <label style="display:flex;align-items:center;gap:5px;padding:6px 12px;border:1.5px solid #e2e8f0;border-radius:20px;cursor:pointer;font-size:0.82rem;font-weight:600;"><input type="checkbox" value="TC"> TC — Tronco Común</label>
-                            <label style="display:flex;align-items:center;gap:5px;padding:6px 12px;border:1.5px solid #e2e8f0;border-radius:20px;cursor:pointer;font-size:0.82rem;font-weight:600;"><input type="checkbox" value="MED"> MED — Medicina</label>
-                            <label style="display:flex;align-items:center;gap:5px;padding:6px 12px;border:1.5px solid #e2e8f0;border-radius:20px;cursor:pointer;font-size:0.82rem;font-weight:600;"><input type="checkbox" value="ODO"> ODO — Odontología</label>
-                            <label style="display:flex;align-items:center;gap:5px;padding:6px 12px;border:1.5px solid #e2e8f0;border-radius:20px;cursor:pointer;font-size:0.82rem;font-weight:600;"><input type="checkbox" value="ENF"> ENF — Enfermería</label>
                         </div>
                         <div style="display:flex; gap:8px; margin-top:12px; align-items:center;">
                             <input type="text" id="np-nueva-carrera-siglas" placeholder="Abreviatura (Ej: FAR)" style="padding:6px 10px;border:1.5px solid #e2e8f0;border-radius:6px;font-size:0.85rem;width:160px;text-transform:uppercase;">
@@ -235,6 +231,12 @@
                         <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:10px;">
                             <label class="lbl-field" style="margin:0;">USUARIOS INICIALES</label>
                             <button type="button" onclick="npAgregarUsuario()" style="background:transparent;color:var(--color-maroon);border:1.5px solid var(--color-maroon);padding:4px 12px;border-radius:6px;cursor:pointer;font-size:0.82rem;font-weight:700;">+ Agregar</button>
+                        </div>
+                        <div style="display:grid;grid-template-columns:1fr 1fr 120px 40px;gap:8px;margin-bottom:4px;padding:0 2px;">
+                            <span style="font-size:0.72rem;font-weight:700;color:#94a3b8;text-transform:uppercase;letter-spacing:0.5px;">Usuario</span>
+                            <span style="font-size:0.72rem;font-weight:700;color:#94a3b8;text-transform:uppercase;letter-spacing:0.5px;">Contraseña</span>
+                            <span style="font-size:0.72rem;font-weight:700;color:#94a3b8;text-transform:uppercase;letter-spacing:0.5px;">Rol</span>
+                            <span></span>
                         </div>
                         <div id="np-usuarios-rows"></div>
                     </div>
@@ -251,6 +253,7 @@
                     </details>
 
                     <div style="margin-top:22px;display:flex;gap:12px;">
+                        <button type="button" onclick="npRegistrarParaDespues()" style="flex:1;background:linear-gradient(135deg,#92400e,#b45309);color:white;border:none;font-size:0.9rem;padding:14px;border-radius:12px;cursor:pointer;font-weight:700;">&#128203; Guardar para después</button>
                         <button class="btn-action" style="flex:2;background:linear-gradient(135deg, #1e3a8a, #3b82f6);box-shadow:0 10px 20px rgba(59,130,246,0.3);font-size:1rem;padding:14px;border-radius:12px;" onclick="npGuardarPlantel()">&#10003; CONFIRMAR Y DESPLEGAR PLANTEL</button>
                     </div>
                     <div id="np-result-msg" style="margin-top:12px;"></div>
@@ -462,12 +465,13 @@
                 <div id="docentes-stats" style="margin-bottom:20px; display:flex; gap:8px; flex-wrap:wrap;">
                     <span style="background:#e2e8f0;color:#444;padding:6px 16px;border-radius:20px;font-weight:600;">Cargando...</span>
                 </div>
-                <!-- Búsqueda en tiempo real -->
-                <div style="margin-bottom:16px;">
-                    <div style="position:relative;max-width:420px;">
+                <!-- Búsqueda y filtros -->
+                <div style="margin-bottom:16px;display:flex;gap:10px;align-items:center;flex-wrap:wrap;">
+                    <div style="position:relative;flex:1;min-width:240px;max-width:420px;">
                         <span style="position:absolute;left:13px;top:50%;transform:translateY(-50%);color:#94a3b8;font-size:1.05rem;">&#128269;</span>
                         <input type="text" id="docente-search" placeholder="Buscar por nombre, RFC, CURP, ID..." oninput="filtrarDocentes()" style="width:100%;padding:10px 14px 10px 40px;border:1.5px solid #e2e8f0;border-radius:10px;font-size:0.95rem;box-sizing:border-box;transition:border 0.2s;" onfocus="this.style.borderColor='#631b2f'" onblur="this.style.borderColor='#e2e8f0'">
                     </div>
+                    <button id="btn-toggle-inactivos" onclick="window.toggleInactivosDocentes()" style="background:#f8fafc;color:#475569;border:1.5px solid #e2e8f0;padding:9px 16px;border-radius:10px;cursor:pointer;font-size:0.85rem;font-weight:700;white-space:nowrap;">Mostrar Inactivos</button>
                 </div>
                 <div class="glass-card">
                     <div class="table-container">
@@ -628,6 +632,8 @@
                         <button id="tab-datos-btn" class="perfil-tab active" onclick="switchPerfilTab('datos')">&#128100; Datos Personales</button>
                         <button id="tab-expediente-btn" class="perfil-tab" onclick="switchPerfilTab('expediente')">&#128194; Expediente PSO</button>
                         <button id="tab-eval-hist-btn" class="perfil-tab" onclick="switchPerfilTab('evalhistorial')">&#128202; Hoja de Conceptos</button>
+                        <button id="tab-vehiculos-btn" class="perfil-tab" onclick="switchPerfilTab('vehiculos')">&#128663; Vehículos</button>
+                        <button id="tab-cursos-btn" class="perfil-tab" onclick="switchPerfilTab('cursos')">&#127891; Cursos</button>
                     </div>
 
                     <!-- TAB: DATOS PERSONALES -->
@@ -736,8 +742,34 @@
                                 </div>
                             </div>
                         </div>
+                            <div>
+                                <label class="lbl-field">ESTATUS EN EL CICLO</label>
+                                <select id="p-estatus" style="width:100%;padding:11px 14px;border:1.5px solid #e2e8f0;border-radius:10px;font-size:0.95rem;" onchange="window.togglePeriodoEstatus(this.value)">
+                                    <option value="ACTIVO">ACTIVO</option>
+                                    <option value="INACTIVO">INACTIVO</option>
+                                </select>
+                            </div>
+                            <div id="p-periodo-container" style="display:none;">
+                                <label class="lbl-field">CICLO EN QUE QUEDÓ INACTIVO</label>
+                                <input id="p-periodo-estatus" placeholder="Ej: SEP-FEB 2025" style="width:100%;padding:11px 14px;border:1.5px solid #e2e8f0;border-radius:10px;font-size:0.9rem;box-sizing:border-box;" onfocus="this.style.borderColor='#631b2f'" onblur="this.style.borderColor='#e2e8f0'">
+                                <small style="color:#94a3b8;font-size:0.72rem;">Selecciona el ciclo anterior o siguiente en que estuvo inactivo.</small>
+                            </div>
+                            <div style="grid-column:1/-1;" id="p-historial-estatus-box">
+                                <label class="lbl-field">HISTORIAL DE ESTATUS POR PERIODO</label>
+                                <div id="p-historial-estatus" style="background:#f8fafc;border:1px solid #e2e8f0;border-radius:10px;padding:10px 14px;font-size:0.82rem;min-height:36px;">
+                                    <em style="color:#aaa;">Sin registros.</em>
+                                </div>
+                            </div>
+                            <div style="grid-column:1/-1;">
+                                <label class="lbl-field">OBSERVACIONES GENERALES</label>
+                                <textarea id="p-observaciones" rows="3" style="width:100%;padding:11px 14px;border:1.5px solid #e2e8f0;border-radius:10px;font-size:0.9rem;font-family:var(--font-main);resize:vertical;" onfocus="this.style.borderColor='#631b2f'" onblur="this.style.borderColor='#e2e8f0'"></textarea>
+                            </div>
                         <input type="hidden" id="p-id">
-                        <div style="margin-top:28px;display:flex;gap:12px;flex-wrap:wrap;">
+
+                        <!-- Aviso de Privacidad — registro de consentimiento -->
+                        <div id="p-aviso-strip" style="margin-top:18px;padding:10px 14px;border-radius:10px;font-size:0.82rem;display:flex;align-items:center;gap:10px;"></div>
+
+                        <div style="margin-top:18px;display:flex;gap:12px;flex-wrap:wrap;">
                             <button type="button" onclick="window.generarPerfilDocente(document.getElementById('p-id').value)" style="flex:1;background:linear-gradient(135deg,#1e3a5f,#2563eb);color:white;border:none;padding:14px;border-radius:12px;cursor:pointer;font-weight:700;font-family:var(--font-main);font-size:0.92rem;">&#128196; Generar Perfil</button>
                             <button id="btn-guardar-perfil" class="btn-action" style="flex:2;" onclick="guardarPerfil()">&#10003; Guardar Cambios</button>
                             <button onclick="cerrarPerfil()" style="flex:1;background:transparent;color:#64748b;border:1.5px solid #e2e8f0;padding:14px;border-radius:12px;cursor:pointer;font-weight:700;font-family:var(--font-main);transition:all 0.2s;" onmouseover="this.style.background='#f8fafc'" onmouseout="this.style.background='transparent'">Cerrar</button>
@@ -780,6 +812,74 @@
                         </div>
                         <div style="margin-top:20px;text-align:right;">
                             <button onclick="cerrarPerfil()" style="background:transparent;color:#64748b;border:1.5px solid #e2e8f0;padding:12px 24px;border-radius:10px;cursor:pointer;font-weight:700;font-family:var(--font-main);">Cerrar</button>
+                        </div>
+                    </div>
+
+                    <!-- TAB: VEHÍCULOS -->
+                    <div id="tab-vehiculos" class="perfil-tab-content" style="padding:32px 36px;display:none;">
+                        <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:20px;">
+                            <h3 style="color:var(--color-maroon);font-family:var(--font-display);font-size:1.1rem;margin:0;">VEHÍCULOS DEL DOCENTE</h3>
+                            <button id="btn-nuevo-vehiculo-perfil" type="button" onclick="window.abrirNuevoVehiculoDesdePerfil()" style="background:linear-gradient(135deg,var(--color-maroon),#8f2343);color:white;border:none;padding:9px 18px;border-radius:10px;cursor:pointer;font-weight:700;font-size:0.85rem;">+ Registrar Vehículo</button>
+                        </div>
+                        <div id="p-vehiculos-list" style="display:grid;gap:10px;">
+                            <em style="color:#aaa;font-size:0.9rem;">Sin vehículos registrados.</em>
+                        </div>
+                    </div>
+
+                    <!-- TAB: CURSOS Y CAPACITACIÓN -->
+                    <div id="tab-cursos" class="perfil-tab-content" style="padding:32px 36px;display:none;">
+                        <h3 style="color:var(--color-maroon);font-family:var(--font-display);font-size:1.1rem;margin:0 0 20px;">CURSOS Y CAPACITACIÓN</h3>
+                        <!-- Formulario para agregar curso -->
+                        <div style="background:#f8fafc;border:1px solid #e2e8f0;border-radius:14px;padding:20px;margin-bottom:24px;">
+                            <p style="font-weight:700;font-size:0.85rem;color:#475569;margin:0 0 14px;text-transform:uppercase;letter-spacing:0.5px;">Agregar nuevo curso</p>
+                            <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px;">
+                                <div style="grid-column:1/-1;">
+                                    <label class="lbl-field">NOMBRE DEL CURSO *</label>
+                                    <input id="nc-nombre" style="width:100%;padding:9px 12px;border:1.5px solid #e2e8f0;border-radius:8px;font-size:0.9rem;box-sizing:border-box;" placeholder="Ej: Inteligencia Artificial aplicada">
+                                </div>
+                                <div>
+                                    <label class="lbl-field">INSTITUCIÓN</label>
+                                    <input id="nc-institucion" style="width:100%;padding:9px 12px;border:1.5px solid #e2e8f0;border-radius:8px;font-size:0.9rem;box-sizing:border-box;" placeholder="Ej: UNAM, Coursera...">
+                                </div>
+                                <div>
+                                    <label class="lbl-field">TIPO</label>
+                                    <select id="nc-tipo" style="width:100%;padding:9px 12px;border:1.5px solid #e2e8f0;border-radius:8px;font-size:0.9rem;">
+                                        <option value="Curso">Curso</option>
+                                        <option value="Diplomado">Diplomado</option>
+                                        <option value="Certificación">Certificación</option>
+                                        <option value="Taller">Taller</option>
+                                        <option value="Congreso">Congreso</option>
+                                        <option value="Otro">Otro</option>
+                                    </select>
+                                </div>
+                                <div>
+                                    <label class="lbl-field">HORAS</label>
+                                    <input id="nc-horas" type="number" min="1" max="9999" style="width:100%;padding:9px 12px;border:1.5px solid #e2e8f0;border-radius:8px;font-size:0.9rem;box-sizing:border-box;" placeholder="Ej: 40">
+                                </div>
+                                <div>
+                                    <label class="lbl-field">ESTADO</label>
+                                    <select id="nc-estatus" style="width:100%;padding:9px 12px;border:1.5px solid #e2e8f0;border-radius:8px;font-size:0.9rem;">
+                                        <option value="Completado">Completado</option>
+                                        <option value="En progreso">En progreso</option>
+                                        <option value="No completado">No completado</option>
+                                    </select>
+                                </div>
+                                <div style="grid-column:1/-1;">
+                                    <label class="lbl-field">OBSERVACIONES</label>
+                                    <input id="nc-observaciones" style="width:100%;padding:9px 12px;border:1.5px solid #e2e8f0;border-radius:8px;font-size:0.9rem;box-sizing:border-box;" placeholder="Opcional">
+                                </div>
+                                <div style="grid-column:1/-1;">
+                                    <label class="lbl-field">CONSTANCIA / CERTIFICADO <span style="font-weight:400;color:#94a3b8;">(opcional)</span></label>
+                                    <input type="file" id="nc-constancia" accept=".pdf,.jpg,.jpeg,.png" style="width:100%;padding:8px 10px;border:1.5px solid #e2e8f0;border-radius:8px;font-size:0.85rem;box-sizing:border-box;">
+                                </div>
+                            </div>
+                            <div style="margin-top:14px;text-align:right;">
+                                <button type="button" onclick="window.agregarCursoDocente()" style="background:linear-gradient(135deg,var(--color-maroon),#8f2343);color:white;border:none;padding:10px 22px;border-radius:10px;cursor:pointer;font-weight:700;font-size:0.88rem;">+ Agregar Curso</button>
+                            </div>
+                        </div>
+                        <!-- Lista de cursos -->
+                        <div id="p-cursos-list" style="display:grid;gap:8px;">
+                            <em style="color:#aaa;font-size:0.9rem;">Sin cursos registrados.</em>
                         </div>
                     </div>
 
@@ -995,11 +1095,72 @@
 
                             </div>
 
-                            <div style="margin-top:24px;display:flex;gap:12px;">
+                            <!-- Aviso de Privacidad -->
+                            <div style="margin-top:20px;background:#fafafa;border:1.5px solid #e2e8f0;border-radius:10px;padding:14px 16px;">
+                                <label style="display:flex;align-items:flex-start;gap:10px;cursor:pointer;font-size:0.85rem;color:#374151;font-weight:500;line-height:1.5;">
+                                    <input type="checkbox" id="add-aviso-check" required style="margin-top:2px;width:16px;height:16px;accent-color:var(--color-maroon);flex-shrink:0;">
+                                    <span>El titular ha sido informado y consiente el tratamiento de sus datos personales conforme al
+                                        <button type="button" onclick="window.abrirAvisoPrivacidad()" style="background:none;border:none;color:var(--color-maroon);font-weight:700;cursor:pointer;padding:0;font-size:0.85rem;text-decoration:underline;">Aviso de Privacidad</button>
+                                        de la institución.
+                                    </span>
+                                </label>
+                            </div>
+
+                            <div style="margin-top:14px;display:flex;gap:12px;">
                                 <button type="submit" class="btn-action" style="flex:2;">&#10003; Guardar Docente</button>
                                 <button type="button" onclick="closeAddModal()" style="flex:1;background:transparent;color:#64748b;border:1.5px solid #e2e8f0;padding:14px;border-radius:12px;cursor:pointer;font-weight:700;font-family:var(--font-main);">Cancelar</button>
                             </div>
                         </form>
+                    </div>
+                </div>
+            </div>
+
+            <!-- MODAL: AVISO DE PRIVACIDAD -->
+            <div id="modal-aviso-privacidad" class="hidden" style="position:fixed;top:0;left:0;right:0;bottom:0;background:rgba(10,15,30,0.82);z-index:2000;display:flex;justify-content:center;align-items:center;padding:20px;">
+                <div style="background:white;width:100%;max-width:620px;border-radius:16px;overflow:hidden;box-shadow:0 30px 80px rgba(0,0,0,0.4);display:flex;flex-direction:column;max-height:90vh;">
+                    <div style="background:var(--color-maroon);padding:20px 24px;display:flex;justify-content:space-between;align-items:center;">
+                        <h3 style="color:white;margin:0;font-family:var(--font-display);font-size:1rem;letter-spacing:1px;">AVISO DE PRIVACIDAD</h3>
+                        <button onclick="document.getElementById('modal-aviso-privacidad').classList.add('hidden')" style="background:rgba(255,255,255,0.15);border:none;color:white;width:32px;height:32px;border-radius:50%;cursor:pointer;font-size:1.1rem;display:flex;align-items:center;justify-content:center;">&#10005;</button>
+                    </div>
+                    <div style="padding:24px 28px;overflow-y:auto;font-size:0.88rem;color:#374151;line-height:1.7;">
+                        <p style="font-weight:700;color:var(--color-maroon);margin-bottom:12px;">RESPONSABLE DEL TRATAMIENTO</p>
+                        <p>La Escuela Militar (<span id="aviso-plantel-nombre" style="font-weight:600;"></span>), en adelante "la Institución", con domicilio en las instalaciones del plantel correspondiente, es responsable del tratamiento de sus datos personales conforme a lo dispuesto por la Ley Federal de Protección de Datos Personales en Posesión de los Particulares (LFPDPPP) y demás normativa aplicable.</p>
+
+                        <p style="font-weight:700;color:var(--color-maroon);margin:16px 0 8px;">DATOS PERSONALES QUE SE RECABAN</p>
+                        <p>La Institución recaba los siguientes datos personales del personal docente:</p>
+                        <ul style="margin:8px 0 8px 20px;">
+                            <li>Datos de identificación: nombre completo, RFC, CURP, INE/IFE.</li>
+                            <li>Datos de contacto: domicilio, teléfono.</li>
+                            <li>Datos académicos y profesionales: grado académico, especialidad, cédula profesional, carrera(s) que imparte.</li>
+                            <li>Datos laborales: condición (civil/militar), grado militar, antigüedad, tipo de contrato, materias asignadas.</li>
+                            <li>Imagen: fotografía del titular.</li>
+                            <li>Documentos: cédula profesional digitalizada, constancias de cursos.</li>
+                        </ul>
+
+                        <p style="font-weight:700;color:var(--color-maroon);margin:16px 0 8px;">FINALIDAD DEL TRATAMIENTO</p>
+                        <p>Sus datos personales serán utilizados para las siguientes finalidades <strong>primarias</strong>, necesarias para la relación docente–institución:</p>
+                        <ul style="margin:8px 0 8px 20px;">
+                            <li>Registro y control del personal docente activo.</li>
+                            <li>Asignación de materias y carga académica.</li>
+                            <li>Elaboración y seguimiento de contratos de servicios docentes.</li>
+                            <li>Generación de evaluaciones y hojas de conceptos personales.</li>
+                            <li>Expedición de constancias y documentos institucionales.</li>
+                            <li>Cumplimiento de obligaciones legales y reglamentarias.</li>
+                        </ul>
+
+                        <p style="font-weight:700;color:var(--color-maroon);margin:16px 0 8px;">TRANSFERENCIAS</p>
+                        <p>La Institución no realizará transferencias de datos personales a terceros, salvo aquellas que sean necesarias para dar cumplimiento a obligaciones previstas en la legislación vigente o requeridas por autoridad competente.</p>
+
+                        <p style="font-weight:700;color:var(--color-maroon);margin:16px 0 8px;">DERECHOS ARCO</p>
+                        <p>El titular de los datos tiene derecho a <strong>Acceder, Rectificar, Cancelar u Oponerse (ARCO)</strong> al tratamiento de sus datos personales. Para ejercer estos derechos, el titular deberá presentar solicitud por escrito ante el responsable del plantel correspondiente, indicando su nombre completo y el derecho que desea ejercer.</p>
+
+                        <p style="font-weight:700;color:var(--color-maroon);margin:16px 0 8px;">CAMBIOS AL AVISO</p>
+                        <p>La Institución se reserva el derecho de modificar el presente Aviso de Privacidad. Cualquier cambio será notificado a través de los canales institucionales.</p>
+
+                        <p style="margin-top:20px;font-size:0.8rem;color:#94a3b8;border-top:1px solid #e2e8f0;padding-top:12px;">Sistema de Gestión Docente (SGD) &mdash; Uso Institucional Restringido.</p>
+                    </div>
+                    <div style="padding:16px 24px;border-top:1px solid #e2e8f0;display:flex;justify-content:flex-end;">
+                        <button onclick="document.getElementById('modal-aviso-privacidad').classList.add('hidden')" style="background:var(--color-maroon);color:white;border:none;padding:10px 28px;border-radius:8px;cursor:pointer;font-weight:700;font-size:0.9rem;">Cerrar</button>
                     </div>
                 </div>
             </div>
@@ -1068,6 +1229,12 @@
                                 <label class="lbl-field">FECHA DE EVALUACIÓN</label>
                                 <input type="date" id="eval-fecha" style="width:100%;padding:10px 13px;border:1.5px solid #e2e8f0;border-radius:9px;font-size:0.92rem;box-sizing:border-box;">
                             </div>
+                        </div>
+
+                        <!-- Unidad de Aprendizaje -->
+                        <div style="margin-bottom:18px;">
+                            <label class="lbl-field">UNIDAD DE APRENDIZAJE / MATERIA</label>
+                            <input id="eval-unidad-aprendizaje" placeholder="Ej: Cálculo Diferencial, Programación I..." style="width:100%;padding:10px 13px;border:1.5px solid #e2e8f0;border-radius:9px;font-size:0.92rem;box-sizing:border-box;">
                         </div>
 
                         <!-- Situación y Concepto Personal -->
@@ -1262,8 +1429,15 @@
                     <h2 style="color:var(--color-maroon);text-transform:uppercase;">Centro de Emisión de Contratos</h2>
                 </div>
                 <!-- Stats / Auditoria -->
-                <div id="contratos-stats" style="margin-bottom:20px;display:flex;gap:8px;flex-wrap:wrap;"></div>
-                
+                <div id="contratos-stats" style="margin-bottom:12px;display:flex;gap:8px;flex-wrap:wrap;"></div>
+
+                <!-- Buscador -->
+                <div style="margin-bottom:16px;">
+                    <input type="text" id="contratos-search" placeholder="🔍 Buscar por docente, carrera o materia..." oninput="window.filtrarContratos(this.value)"
+                        style="width:100%;max-width:480px;padding:9px 14px;border:1.5px solid #e2e8f0;border-radius:10px;font-size:0.88rem;color:#334155;outline:none;"
+                        onfocus="this.style.borderColor='var(--color-maroon)'" onblur="this.style.borderColor='#e2e8f0'">
+                </div>
+
                 <div class="glass-card">
                     <div class="table-container">
                         <table class="data-table">
@@ -1320,9 +1494,9 @@
         </main>
 
         <!-- Logout -->
-        <button id="btn-logout" class="btn-logout-floating">Cerrar Sesion</button>
+        <button id="btn-logout" class="btn-logout-floating" style="display:none;">Cerrar Sesion</button>
     </div>
 
-    <script src="app.js?v=2026.17"></script>
+    <script src="app.js?v=2026.33"></script>
 </body>
 </html>

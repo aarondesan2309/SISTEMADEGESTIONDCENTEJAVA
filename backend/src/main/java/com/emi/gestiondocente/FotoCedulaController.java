@@ -7,9 +7,11 @@ import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.web.bind.annotation.*;
 import org.springframework.web.multipart.MultipartFile;
 
+import java.io.InputStream;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.nio.file.Paths;
+import java.nio.file.StandardCopyOption;
 import java.util.HashMap;
 import java.util.Map;
 
@@ -39,7 +41,9 @@ public class FotoCedulaController {
             String savedName = "foto_" + docenteId + ext;
             Path dest = Paths.get(fotosDir + savedName);
             Files.createDirectories(dest.getParent());
-            file.transferTo(dest.toFile());
+            try (InputStream in = file.getInputStream()) {
+                Files.copy(in, dest, StandardCopyOption.REPLACE_EXISTING);
+            }
 
             jdbcTemplate.update(
                 "UPDATE Docente SET foto_path = ? WHERE docente_id = ?",
@@ -72,7 +76,9 @@ public class FotoCedulaController {
             String savedName = "cedula_" + docenteId + ext;
             Path dest = Paths.get(cedulasDir + savedName);
             Files.createDirectories(dest.getParent());
-            file.transferTo(dest.toFile());
+            try (InputStream in = file.getInputStream()) {
+                Files.copy(in, dest, StandardCopyOption.REPLACE_EXISTING);
+            }
 
             jdbcTemplate.update(
                 "UPDATE Docente SET cedula_path = ? WHERE docente_id = ?",

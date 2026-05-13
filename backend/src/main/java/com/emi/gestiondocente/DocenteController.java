@@ -26,6 +26,11 @@ public class DocenteController {
             "ALTER TABLE docente ADD COLUMN IF NOT EXISTS estado_civil VARCHAR(30)",
             "ALTER TABLE docente ADD COLUMN IF NOT EXISTS estudios_en VARCHAR(255)",
             "ALTER TABLE docente ADD COLUMN IF NOT EXISTS fecha_contratacion VARCHAR(60)",
+            "ALTER TABLE docente ADD COLUMN IF NOT EXISTS estatus VARCHAR(20) DEFAULT 'ACTIVO'",
+            "ALTER TABLE docente ADD COLUMN IF NOT EXISTS observaciones TEXT",
+            "ALTER TABLE docente ADD COLUMN IF NOT EXISTS aviso_aceptado BOOLEAN DEFAULT FALSE",
+            "ALTER TABLE docente ADD COLUMN IF NOT EXISTS aviso_fecha TIMESTAMP",
+            "ALTER TABLE docente ADD COLUMN IF NOT EXISTS aviso_por VARCHAR(100)",
             """
             CREATE TABLE IF NOT EXISTS audit_log (
                 log_id SERIAL PRIMARY KEY,
@@ -35,6 +40,20 @@ public class DocenteController {
                 entidad_id INT,
                 detalle TEXT,
                 fecha TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+            )
+            """,
+            """
+            CREATE TABLE IF NOT EXISTS curso_docente (
+                curso_id SERIAL PRIMARY KEY,
+                docente_id INT,
+                nombre VARCHAR(200) NOT NULL,
+                institucion VARCHAR(200),
+                tipo VARCHAR(50) DEFAULT 'Curso',
+                fecha_inicio VARCHAR(30),
+                fecha_fin VARCHAR(30),
+                horas INT,
+                estatus_curso VARCHAR(30) DEFAULT 'Completado',
+                observaciones TEXT
             )
             """
         };
@@ -70,7 +89,7 @@ public class DocenteController {
     public ResponseEntity<List<Map<String, Object>>> getDocentes() {
         String sql = """
             SELECT d.docente_id, d.nombre, d.grado_acad, d.grado_mil,
-                   d.condicion, d.rfc, d.curp,
+                   d.condicion, d.rfc, d.curp, d.estatus,
                    string_agg(DISTINCT c.siglas, ', ') as carrera,
                    string_agg(DISTINCT m.nombre || ' (' || c.siglas || ')', ', ') as materias_nombres
             FROM Docente d
@@ -228,13 +247,15 @@ public class DocenteController {
             Integer newId = jdbcTemplate.queryForObject(
                 """
                 INSERT INTO Docente(nombre, rfc, curp, condicion, grado_acad, grado_mil,
-                    matricula, genero, tipo_sangre, credencial_ine, domicilio, regimen_sat)
-                VALUES(?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                    matricula, genero, tipo_sangre, credencial_ine, domicilio, regimen_sat,
+                    aviso_aceptado, aviso_fecha, aviso_por)
+                VALUES(?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, TRUE, NOW(), ?)
                 RETURNING docente_id
                 """,
                 Integer.class,
                 nombre, rfc, curp, condicion, gradoAcad, gradoMil,
-                matricula, genero, sangre, ine, domicilio, regimenSat
+                matricula, genero, sangre, ine, domicilio, regimenSat,
+                usuario
             );
 
             if (newId != null && materia != null && !materia.isEmpty()) {
@@ -311,7 +332,9 @@ public class DocenteController {
                     estado_natural = ?,
                     estado_civil = ?,
                     estudios_en = ?,
-                    fecha_contratacion = ?
+                    fecha_contratacion = ?,
+                    estatus = ?,
+                    observaciones = ?
                 WHERE docente_id = ?
                 """,
                 str(payload.get("nombre")),
@@ -330,9 +353,24 @@ public class DocenteController {
                 str(payload.get("estado_civil")),
                 str(payload.get("estudios_en")),
                 str(payload.get("fecha_contratacion")),
+                str(payload.get("estatus")).isEmpty() ? "ACTIVO" : str(payload.get("estatus")),
+                str(payload.get("observaciones")),
                 id
             );
             audit(usuario, "MODIFICAR", "DOCENTE", id, "Nombre: " + str(payload.get("nombre")));
+
+            // Registrar historial de estatus si viene periodo
+            String periodo = str(payload.get("periodo_estatus"));
+            String nuevoEstatus = str(payload.get("estatus")).isEmpty() ? "ACTIVO" : str(payload.get("estatus"));
+            if (!periodo.isEmpty()) {
+                try {
+                    ensureExtraTables();
+                    jdbcTemplate.update(
+                        "INSERT INTO historial_estatus_docente(docente_id,periodo,estatus) VALUES(?,?,?)",
+                        id, periodo, nuevoEstatus
+                    );
+                } catch (Exception ignored) {}
+            }
 
             Map<String, Object> result = new HashMap<>();
             result.put("status", "ok");
@@ -343,6 +381,22 @@ public class DocenteController {
             error.put("status", "error");
             error.put("message", e.getMessage());
             return ResponseEntity.internalServerError().body(error);
+        }
+    }
+
+    // =============================================
+    // GET /api/docentes/{id}/historial-estatus
+    // =============================================
+    @GetMapping("/docentes/{id}/historial-estatus")
+    public ResponseEntity<List<Map<String, Object>>> getHistorialEstatus(@PathVariable int id) {
+        ensureExtraTables();
+        try {
+            List<Map<String, Object>> rows = jdbcTemplate.queryForList(
+                "SELECT hid, periodo, estatus, to_char(fecha_registro,'DD/MM/YYYY HH24:MI') as fecha " +
+                "FROM historial_estatus_docente WHERE docente_id = ? ORDER BY hid DESC", id);
+            return ResponseEntity.ok(rows);
+        } catch (Exception e) {
+            return ResponseEntity.ok(List.of());
         }
     }
 
@@ -383,6 +437,38 @@ public class DocenteController {
             error.put("status", "error");
             error.put("message", "Error al eliminar: " + e.getMessage());
             return ResponseEntity.internalServerError().body(error);
+        }
+    }
+
+    private void ensureExtraTables() {
+        String[] ddl = {
+            "CREATE TABLE IF NOT EXISTS curso_docente (" +
+            "  curso_id SERIAL PRIMARY KEY, docente_id INT, nombre VARCHAR(200) NOT NULL," +
+            "  institucion VARCHAR(200), tipo VARCHAR(50) DEFAULT 'Curso'," +
+            "  horas INT, estatus_curso VARCHAR(30) DEFAULT 'Completado', observaciones TEXT)",
+            "CREATE TABLE IF NOT EXISTS historial_estatus_docente (" +
+            "  hid SERIAL PRIMARY KEY, docente_id INT NOT NULL," +
+            "  periodo VARCHAR(60) NOT NULL, estatus VARCHAR(20) NOT NULL DEFAULT 'ACTIVO'," +
+            "  fecha_registro TIMESTAMP DEFAULT CURRENT_TIMESTAMP)",
+            "ALTER TABLE docente ADD COLUMN IF NOT EXISTS estatus VARCHAR(20) DEFAULT 'ACTIVO'",
+            "ALTER TABLE docente ADD COLUMN IF NOT EXISTS observaciones TEXT"
+        };
+        for (String sql : ddl) {
+            try { jdbcTemplate.execute(sql); } catch (Exception ignored) {}
+        }
+    }
+
+    // =============================================
+    // GET /api/docentes/{id}/vehiculos  — vehículos de un docente específico
+    // =============================================
+    @GetMapping("/docentes/{id}/vehiculos")
+    public ResponseEntity<List<Map<String, Object>>> getVehiculosDocente(@PathVariable int id) {
+        try {
+            List<Map<String, Object>> rows = jdbcTemplate.queryForList(
+                "SELECT vehiculo_id, marca, modelo, anio, color, placas FROM Vehiculo WHERE docente_id = ? ORDER BY vehiculo_id DESC", id);
+            return ResponseEntity.ok(rows);
+        } catch (Exception e) {
+            return ResponseEntity.ok(List.of());
         }
     }
 

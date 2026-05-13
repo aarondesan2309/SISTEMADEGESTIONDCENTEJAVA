@@ -26,7 +26,11 @@ out_temp_*.docx
 prueba.docx
 temp_docx/
 tmp_docx_inspect/
+docx-inspect/
+test-docx-inspect/
+test_contrato.docx
 ~$*.docx
+server.log
 
 # DATOS PRIVADOS (PSO) - NO SUBIR POR SEGURIDAD
 fotos/

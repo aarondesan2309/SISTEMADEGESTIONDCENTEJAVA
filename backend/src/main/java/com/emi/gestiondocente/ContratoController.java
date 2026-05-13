@@ -32,9 +32,13 @@ public class ContratoController {
     @GetMapping("/contratos")
     public ResponseEntity<List<Map<String, Object>>> getContratos() {
         String sql = "SELECT d.docente_id, d.nombre, d.condicion, d.rfc, d.curp, d.regimen_sat, " +
-                "m.nombre as materia, c.emitido_por, c.folio, " +
+                "m.materia_id, m.nombre as materia, c.id as contrato_id, c.emitido_por, c.folio, " +
                 "to_char(c.fecha_emision, 'YYYY-MM-DD HH24:MI:SS') as fecha_emision, " +
-                "car.siglas as carrera " +
+                "car.siglas as carrera, " +
+                "COALESCE(a.horas, 0) as horas, " +
+                "COALESCE(a.horas_m1, 0) as horas_m1, COALESCE(a.horas_m2, 0) as horas_m2, " +
+                "COALESCE(a.horas_m3, 0) as horas_m3, COALESCE(a.horas_m4, 0) as horas_m4, " +
+                "COALESCE(a.nivel_pago, 'Licenciatura') as nivel_pago " +
                 "FROM docente d " +
                 "JOIN asignacion a ON d.docente_id = a.docente_id " +
                 "JOIN materia m ON a.materia_id = m.materia_id " +
@@ -132,17 +136,18 @@ public class ContratoController {
                 }
             }
 
-            // Validar si ya existe un contrato para esta materia y docente
-            Integer contratoExistente = jdbcTemplate.queryForObject(
-                    "SELECT COUNT(*) FROM contrato_emitido WHERE docente_id = ? AND materia_id = ?",
-                    Integer.class, docId, materiaId);
+            boolean reprint = Boolean.TRUE.equals(payload.get("reprint"));
 
-            if (contratoExistente != null && contratoExistente > 0) {
+            // Validar si ya existe un contrato para esta materia y docente
+            List<Map<String, Object>> existentes = jdbcTemplate.queryForList(
+                    "SELECT id, folio FROM contrato_emitido WHERE docente_id = ? AND materia_id = ?",
+                    docId, materiaId);
+
+            if (!existentes.isEmpty() && !reprint) {
                 return ResponseEntity.badRequest()
                         .body(Collections.singletonMap("message",
                                 "Ya se ha generado un contrato para esta materia anteriormente."));
             }
-
 
             // Validar que la materia está asignada al docente y tiene horas
             BigDecimal horasMateria = jdbcTemplate.queryForObject(
@@ -176,19 +181,18 @@ public class ContratoController {
                                         ". Verifica la propiedad sgdc.storage.contrato-template en application.properties."));
             }
 
-            Integer newId = jdbcTemplate.queryForObject(
-                    "INSERT INTO contrato_emitido (docente_id, materia_id, emitido_por) VALUES (?, ?, ?) RETURNING id",
-                    Integer.class, docId, materiaId, emitidoPor);
-
-            // ✅ FIX 6: Protección contra newId null (fallo silencioso de la BD).
-            if (newId == null) {
-                return ResponseEntity.internalServerError()
-                        .body(Collections.singletonMap("message",
-                                "Error al registrar el contrato en la base de datos."));
+            int newId;
+            String folio;
+            if (reprint && !existentes.isEmpty()) {
+                newId = ((Number) existentes.get(0).get("id")).intValue();
+                folio = String.valueOf(existentes.get(0).get("folio"));
+            } else {
+                newId = jdbcTemplate.queryForObject(
+                        "INSERT INTO contrato_emitido (docente_id, materia_id, emitido_por) VALUES (?, ?, ?) RETURNING id",
+                        Integer.class, docId, materiaId, emitidoPor);
+                folio = "E.M.Ingría. " + (230 + newId);
+                jdbcTemplate.update("UPDATE contrato_emitido SET folio = ? WHERE id = ?", folio, newId);
             }
-
-            String folio = "E.M.Ingría. " + (230 + newId);
-            jdbcTemplate.update("UPDATE contrato_emitido SET folio = ? WHERE id = ?", folio, newId);
 
             Map<String, Object> docente = jdbcTemplate.queryForMap(
                     "SELECT d.nombre, d.rfc, d.curp, d.grado_acad, d.condicion, d.genero, " +
@@ -204,13 +208,24 @@ public class ContratoController {
             // Filtrar SOLO por la materia seleccionada — LIMIT 1 evita duplicados si hay
             // múltiples filas de asignacion para el mismo (docente, materia)
             List<Map<String, Object>> materias = jdbcTemplate.queryForList(
-                    "SELECT m.nombre as materia, a.horas, a.horas_m1, a.horas_m2, a.horas_m3, a.horas_m4, a.nivel_pago " +
+                    "SELECT m.nombre as materia, a.horas, a.horas_m1, a.horas_m2, a.horas_m3, a.horas_m4, " +
+                            "a.nivel_pago, a.ciclo_id " +
                             "FROM asignacion a JOIN materia m ON a.materia_id = m.materia_id " +
                             "WHERE a.docente_id = ? AND m.materia_id = ? AND a.horas > 0 " +
                             "ORDER BY a.horas DESC LIMIT 1",
                     docId, materiaId);
 
-            Map<String, String> replacements = buildReplacements(docente, materias, folio);
+            // Cargar el ciclo académico de la asignación (si tiene). Si no hay ciclo, se usa
+            // valores hardcoded como fallback (compatibilidad pre-migración).
+            Map<String, Object> ciclo = null;
+            if (!materias.isEmpty() && materias.get(0).get("ciclo_id") != null) {
+                Integer cicloId = ((Number) materias.get(0).get("ciclo_id")).intValue();
+                List<Map<String, Object>> ciclos = jdbcTemplate.queryForList(
+                        "SELECT * FROM ciclo_academico WHERE id = ?", cicloId);
+                if (!ciclos.isEmpty()) ciclo = ciclos.get(0);
+            }
+
+            Map<String, String> replacements = buildReplacements(docente, materias, folio, ciclo);
             byte[] docxBytes = modifyZip(actualTemplatePath, replacements);
 
             // ✅ FIX 7: Nombre de archivo seguro — elimina caracteres problemáticos
@@ -251,6 +266,14 @@ public class ContratoController {
 
                 if (name.endsWith(".xml") || name.endsWith(".rels")) {
                     String content = new String(bytes, StandardCharsets.UTF_8);
+
+                    // Normalizar «CAMPO» fragmentados por spell-check de Word
+                    // Word separa «X» en tres runs: <w:t>«</w:t> + <w:proofErr/> + <w:t>X</w:t> + <w:t>»</w:t>
+                    content = content.replaceAll("<w:proofErr[^>]*/?>", "");
+                    content = Pattern.compile(
+                        "<w:t>«</w:t></w:r><w:r[^>]*>(?:<w:rPr>.*?</w:rPr>)?<w:t>([\\w]+)</w:t></w:r><w:r[^>]*>(?:<w:rPr>.*?</w:rPr>)?<w:t>»</w:t></w:r>",
+                        Pattern.DOTALL
+                    ).matcher(content).replaceAll("<w:t>«$1»</w:t></w:r>");
 
                     for (Map.Entry<String, String> rep : replacements.entrySet()) {
                         String key = rep.getKey();
@@ -370,7 +393,8 @@ public class ContratoController {
 
     private Map<String, String> buildReplacements(Map<String, Object> doc,
             List<Map<String, Object>> materias,
-            String folio) {
+            String folio,
+            Map<String, Object> ciclo) {
         Map<String, String> r = new HashMap<>();
         NumberFormat nf = NumberFormat.getNumberInstance(new Locale("es", "MX"));
         nf.setMinimumFractionDigits(2);
@@ -391,7 +415,7 @@ public class ContratoController {
         r.put("RFC", val(doc, "rfc"));
         r.put("CURP", val(doc, "curp"));
         r.put("DOMICILIO", val(doc, "domicilio"));
-        r.put("INE_PASAPORTE", val(doc, "credencial_ine"));
+        r.put("INE_PASAPORTE", "Credencial para Votar No.");
         r.put("NO_INE", val(doc, "credencial_ine"));
         r.put("NACIONALIDAD", "Mexicana");
         r.put("FOLIO", folio);
@@ -414,6 +438,7 @@ public class ContratoController {
         r.put("SEXO", f ? "La" : "El");
         r.put("PRESTADOR1", f ? "a" : "");
         r.put("AuO", f ? "a" : "");
+        r.put("AuQ", f ? "a" : "");
         r.put("DEL_DELA", f ? "de la" : "del");
         r.put("Una_Un_prestador", f ? "una" : "un");
 
@@ -471,15 +496,38 @@ public class ContratoController {
         r.put("UNIDAD_DE_APENDIZAJE", msb.toString());
         r.put("NIVEL_IMPARTIR", nivel);
 
-        // --- Tabuladores UDEFA ---
-        BigDecimal thora;
-        switch (nivel.toLowerCase()) {
-            case "doctorado": thora = new BigDecimal("1048.95"); break;
-            case "maestría":
-            case "maestria":  thora = new BigDecimal("734.27"); break;
-            case "técnico":
-            case "tecnico":   thora = new BigDecimal("199.30"); break;
-            default:          thora = new BigDecimal("419.58"); break;
+        // Fallback 1: sin desglose mensual (todos en 0) → distribuir total entre 4 meses
+        final BigDecimal thFinal = th;
+        boolean sinDesglose = java.util.Arrays.stream(hMeses).allMatch(h -> h.compareTo(BigDecimal.ZERO) == 0);
+        // Fallback 2: patrón viejo (cada mes = total, bug histórico) → dividir por 4
+        boolean patronViejo = !sinDesglose && thFinal.compareTo(BigDecimal.ZERO) > 0
+                && java.util.Arrays.stream(hMeses).allMatch(h -> h.compareTo(thFinal) == 0);
+        if ((sinDesglose || patronViejo) && thFinal.compareTo(BigDecimal.ZERO) > 0) {
+            BigDecimal porMes = thFinal.divide(new BigDecimal("4"), 2, RoundingMode.HALF_UP);
+            for (int i = 0; i < 4; i++) hMeses[i] = porMes;
+        }
+
+        // --- Tabuladores: intentar leer del ciclo, fallback a hardcoded ---
+        BigDecimal thora = null;
+        if (ciclo != null) {
+            Integer cicloId = ((Number) ciclo.get("id")).intValue();
+            List<Map<String, Object>> tabs = jdbcTemplate.queryForList(
+                    "SELECT monto_por_hora FROM tabulador_pago WHERE ciclo_id = ? AND LOWER(nivel) = LOWER(?)",
+                    cicloId, nivel);
+            if (!tabs.isEmpty()) {
+                thora = new BigDecimal(tabs.get(0).get("monto_por_hora").toString());
+            }
+        }
+        if (thora == null) {
+            // Fallback a tabuladores hardcoded (compatibilidad pre-migración)
+            switch (nivel.toLowerCase()) {
+                case "doctorado": thora = new BigDecimal("1048.95"); break;
+                case "maestría":
+                case "maestria":  thora = new BigDecimal("734.27"); break;
+                case "técnico":
+                case "tecnico":   thora = new BigDecimal("199.30"); break;
+                default:          thora = new BigDecimal("419.58"); break;
+            }
         }
         r.put("POR_HORA", nf.format(thora));
         r.put("IMP_HS", "$" + nf.format(thora));
@@ -525,7 +573,7 @@ public class ContratoController {
             subtotalTotal = subtotalTotal.add(subtotalM);
         }
 
-        r.put("T_HS", th.stripTrailingZeros().toPlainString());
+        r.put("T_HS", th.stripTrailingZeros().toPlainString() + " Hrs. Total");
         r.put("HORAS", th.stripTrailingZeros().toPlainString());
         r.put("T_IB", "$" + nf.format(brutoTotal));
         r.put("T_SUB", "$" + nf.format(brutoTotal));
@@ -539,16 +587,29 @@ public class ContratoController {
         r.put("T_IN", "$" + nf.format(netoTotal));
 
         // Otros alias comunes
-        r.put("HORAS", th.stripTrailingZeros().toPlainString());
         r.put("IMP_BRUTO", "$" + nf.format(brutoTotal));
         r.put("IMP_NETO", "$" + nf.format(netoTotal));
         r.put("TOTAL_RECIBIR", nf.format(netoTotal));  // template tiene "$" literal antes del campo
         r.put("LETRA", amountToWords(netoTotal));       // monto en palabras
 
-        // --- Datos del periodo contractual ---
-        r.put("PERIODO", "Marzo - Junio 2026");
-        r.put("FECHA_INICIO", "10 de marzo de 2026");
-        r.put("DURACION", "4 meses");
+        // --- Datos del periodo contractual (del ciclo activo, con fallback hardcoded) ---
+        if (ciclo != null) {
+            r.put("PERIODO",      val(ciclo, "periodo_txt"));
+            r.put("FECHA_INICIO", formatFechaLarga(ciclo.get("fecha_contrato")));
+            r.put("DURACION",     val(ciclo, "duracion_txt"));
+            r.put("MES1_NOMBRE",  val(ciclo, "mes1_nombre"));
+            r.put("MES2_NOMBRE",  val(ciclo, "mes2_nombre"));
+            r.put("MES3_NOMBRE",  val(ciclo, "mes3_nombre"));
+            r.put("MES4_NOMBRE",  val(ciclo, "mes4_nombre"));
+        } else {
+            r.put("PERIODO",      "Marzo - Junio 2026");
+            r.put("FECHA_INICIO", "10 de marzo de 2026");
+            r.put("DURACION",     "4 meses");
+            r.put("MES1_NOMBRE",  "Marzo 2026");
+            r.put("MES2_NOMBRE",  "Abril 2026");
+            r.put("MES3_NOMBRE",  "Mayo 2026");
+            r.put("MES4_NOMBRE",  "Junio 2026");
+        }
 
         // ✅ FIX 15: Exponer también el régimen SAT en el documento por si la plantilla
         // lo usa.
@@ -560,6 +621,24 @@ public class ContratoController {
     private String val(Map<?, Object> m, String k) {
         Object v = m.get(k);
         return (v != null) ? v.toString().trim() : "";
+    }
+
+    // Formatea una fecha (java.sql.Date / java.time.LocalDate / String) como
+    // "DD de <mes> de YYYY" en español. Usado para la cláusula del contrato.
+    private String formatFechaLarga(Object fecha) {
+        if (fecha == null) return "";
+        java.time.LocalDate d;
+        if (fecha instanceof java.time.LocalDate) {
+            d = (java.time.LocalDate) fecha;
+        } else if (fecha instanceof java.sql.Date) {
+            d = ((java.sql.Date) fecha).toLocalDate();
+        } else {
+            try { d = java.time.LocalDate.parse(fecha.toString()); }
+            catch (Exception e) { return fecha.toString(); }
+        }
+        String[] meses = {"enero","febrero","marzo","abril","mayo","junio",
+                          "julio","agosto","septiembre","octubre","noviembre","diciembre"};
+        return d.getDayOfMonth() + " de " + meses[d.getMonthValue() - 1] + " de " + d.getYear();
     }
 
     private String amountToWords(BigDecimal amount) {
